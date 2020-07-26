@@ -30,4 +30,5 @@ library
   build-depends: primitive
   hs-source-dirs: src
   exposed-modules:
-    Ref
+    Ref,
+    Vec
