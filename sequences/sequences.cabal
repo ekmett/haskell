@@ -1,0 +1,61 @@
+cabal-version: 3.4
+name: sequences
+version: 0
+synopsis: sequences
+description: monoid- and group-relative stacks, queues, and catenable lists
+homepage: https://github.com/ekmett/haskell
+license: BSD-2-Clause OR Apache-2.0
+license-file: LICENSE.md
+author: Edward Kmett
+maintainer: Edward Kmett <ekmett@gmail.com>
+copyright: Copyright (c) 2020 Edward Kmett
+stability: experimental
+category: Data Structures
+build-type: Simple
+extra-doc-files:
+  README.md,
+  CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/ekmett/haskell
+  subdir: sequences
+
+common base
+  visible: True
+  default-language: Haskell2010
+  build-depends:
+    base >= 4.14 && < 5,
+    data-default
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
+    -Wredundant-constraints -Widentities -Wmissing-export-lists
+
+library common
+  import: base
+  hs-source-dirs: common
+  build-depends:
+    transformers
+  exposed-modules:
+    Aligned.Base
+    Aligned.Internal
+    Unaligned.Base
+    Unaligned.Internal
+
+library group-relative
+  import: base
+  build-depends: sequences:common, groups
+  hs-source-dirs: group-relative
+  signatures: Delta
+  exposed-modules: 
+    Relative
+    Relative.Unaligned
+
+library 
+  import: base
+  build-depends: sequences:common
+  reexported-modules:
+    Unaligned.Base,
+    Unaligned.Internal,
+    Aligned.Base,
+    Aligned.Internal

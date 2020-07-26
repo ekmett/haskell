@@ -1,0 +1,9 @@
+signature Delta (Delta) where
+
+import Data.Group
+
+data Delta
+
+instance Semigroup Delta
+instance Monoid Delta
+instance Group Delta
