@@ -1,9 +1,11 @@
 {-# language DeriveTraversable #-}
 {-# language TypeFamilies #-}
 {-# language PatternSynonyms #-}
+{-# language BangPatterns #-}
 {-# language ViewPatterns #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language OverloadedLists #-}
+{-# language RoleAnnotations #-}
 
 module Relative.Unaligned
   ( View(..) -- re-export
@@ -19,6 +21,9 @@ module Relative.Unaligned
   , pattern Nil
   , pattern Cons
   , pattern Snoc
+  , fromListL
+  , fromListQ
+  , foldMapL
   , foldMapQ
   , foldMapCat
   ) where
@@ -26,8 +31,10 @@ module Relative.Unaligned
 import Delta
 import Data.Default
 import Data.Monoid (Dual(..))
+import Data.Function (on)
 import GHC.Exts as Exts
 import Relative
+import Text.Read
 import Unaligned.Internal (View(..), Rev(..))
 
 --------------------------------------------------------------------------------
@@ -98,6 +105,26 @@ data List a = ListCons {-# UNPACK #-} !Delta a (List a) | ListNil
 
 {-# complete Nil, Cons :: List #-}
 
+type role List nominal
+
+instance (Show a, Relative a) => Show (List a) where
+  showsPrec d = showsPrec d . Exts.toList
+
+instance Read a => Read (List a) where
+  readPrec = fromListL <$> readListPrec
+
+instance (Eq a, Relative a) => Eq (List a) where
+  (==) = go mempty mempty where
+    go !m !n (ListCons m' a as) (ListCons n' b bs)
+      = rel m'' a == rel n'' b && go m'' n'' as bs
+      where m'' = m <> m'
+            n'' = n <> n'
+    go _ _ ListNil ListNil = True
+    go _ _ _ _ = False
+
+instance (Ord a, Relative a) => Ord (List a) where
+  compare = compare `on` Exts.toList
+
 instance Relative (List a) where
 --  rel 0 xs = xs
   rel _ ListNil = ListNil
@@ -122,6 +149,9 @@ instance Relative a => IsList (List a) where
   fromListN _ = foldr cons nil
   toList = foldMapL pure
 
+fromListL :: [a] -> List a
+fromListL = foldr (ListCons mempty) ListNil
+
 foldMapL :: (Relative a, Monoid m) => (a -> m) -> List a -> m
 foldMapL f = go mempty where
   go d (ListCons d' a as) = f (rel d'' a) <> go d'' as where d'' = d <> d'
@@ -133,9 +163,17 @@ foldMapL f = go mempty where
 
 data Q a = Q (List a) (Rev List a) (List a)
 
+type role Q nominal
+
 instance Relative (Q a) where
 --  rel 0 xs = xs
   rel d (Q as bs cs) = Q (rel d as) (rel d bs) cs
+
+instance (Eq a, Relative a) => Eq (Q a) where
+  (==) = (==) `on` Exts.toList
+
+instance (Ord a, Relative a) => Ord (Q a) where
+  compare = compare `on` Exts.toList
 
 {-# complete Nil, Cons :: Q #-}
 
@@ -145,6 +183,9 @@ instance Default (Q a) where
 instance (Show a, Relative a) => Show (Q a) where
   showsPrec d = showsPrec d . Exts.toList
 
+instance Read a => Read (Q a) where
+  readPrec = fromListQ <$> readListPrec
+
 instance Relative a => IsList (Q a) where
   type Item (Q a) = a
   fromList = foldr cons nil
@@ -153,6 +194,10 @@ instance Relative a => IsList (Q a) where
 
 foldMapQ :: (Relative a, Monoid m) => (a -> m) -> Q a -> m
 foldMapQ f (Q as (Rev bs) _) = foldMapL f as <> getDual (foldMapL (Dual . f) bs)
+
+fromListQ :: [a] -> Q a
+fromListQ xs = Q ys (Rev ListNil) ys where
+  ys = fromListL xs
 
 instance Nil Q where
   nil = Q ListNil (Rev ListNil) ListNil
@@ -186,6 +231,12 @@ rotate _ _ _ = error "Q.rotate: invariant broken"
 
 data Cat a = E | C a !(Q (Cat a))
 
+{-# complete Nil, C #-}
+{-# complete E, Cons #-}
+{-# complete Nil, Cons :: Cat #-}
+
+type role Cat nominal
+
 instance Relative a => Relative (Cat a) where
   rel _ E = E
   -- rel 0 as = as
@@ -194,16 +245,21 @@ instance Relative a => Relative (Cat a) where
 instance Relative a => RelativeSemigroup (Cat a)
 instance Relative a => RelativeMonoid (Cat a)
 
-instance (Relative a, Show a) => Show (Cat a) where
+instance (Show a, Relative a) => Show (Cat a) where
   showsPrec d = showsPrec d . Exts.toList
+
+instance (Read a, Relative a) => Read (Cat a) where
+  readPrec = Exts.fromList <$> readListPrec
+
+instance (Eq a, Relative a) => Eq (Cat a) where
+  (==) = (==) `on` Exts.toList
+
+instance (Ord a, Relative a) => Ord (Cat a) where
+  compare = compare `on` Exts.toList
 
 foldMapCat :: (Relative a, Monoid m) => (a -> m) -> Cat a -> m
 foldMapCat _ E = mempty
 foldMapCat f (C a as) = f a <> foldMapQ (foldMapCat f) as
-
-{-# complete Nil, C #-}
-{-# complete E, Cons #-}
-{-# complete Nil, Cons :: Cat #-}
 
 instance Default (Cat a) where
   def = E
@@ -250,3 +306,5 @@ instance Singleton Cat where
 
 instance Snoc Cat where
   snoc xs a = xs <> singleton a
+
+-- todo: fromListCat can avoid Relative constraint, and can simplify Read constraint
