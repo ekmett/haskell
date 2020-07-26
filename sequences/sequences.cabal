@@ -42,16 +42,25 @@ library common
     Unaligned.Base
     Unaligned.Internal
 
+library monoid-relative
+  import: base
+  build-depends: sequences:common
+  hs-source-dirs: monoid-relative
+  signatures: Delta
+  exposed-modules:
+    Relative
+    Relative.Unaligned
+
 library group-relative
   import: base
   build-depends: sequences:common, groups
   hs-source-dirs: group-relative
   signatures: Delta
-  exposed-modules: 
+  exposed-modules:
     Relative
     Relative.Unaligned
 
-library 
+library
   import: base
   build-depends: sequences:common
   reexported-modules:

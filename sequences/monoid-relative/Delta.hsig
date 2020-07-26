@@ -1,0 +1,6 @@
+signature Delta (Delta) where
+
+data Delta
+
+instance Semigroup Delta
+instance Monoid Delta
