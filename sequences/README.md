@@ -1,10 +1,9 @@
-monorepo
-========
+sequences
+=========
 
-[![Travis Continuous Integration Status][travis-img]][travis]
-
-This is an attempt to find a better workflow for working with multiple haskell
-packages again.
+This is an implementation of various aligned/unaligned sequence types, with
+optional support for a group or monoid action, using "Reflection without Remorse"
+for aligned sequences.
 
 License
 -------
@@ -35,5 +34,3 @@ Please feel free to contact me through github or on the `#haskell` IRC channel o
 
  [license-apache]: http://www.apache.org/licenses/LICENSE-2.0
  [license-bsd]: https://opensource.org/licenses/BSD-2-Clause
- [travis]: http://travis-ci.org/ekmett/monorepo
- [travis-img]: https://secure.travis-ci.org/ekmett/monorepo.png?branch=master
