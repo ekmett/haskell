@@ -1,7 +1,7 @@
-unification
-===========
+free-sequences
+==============
 
-This is a small library for handling unification on free data structures.
+This is a small library for free monads based on type-aligned sequences in the "Reflection without Remorse" style.
 
 License
 -------
