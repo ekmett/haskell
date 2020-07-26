@@ -28,4 +28,5 @@ library
   build-depends: base, primitive
   hs-source-dirs: src
   exposed-modules:
+    Data.Type.Coercion.Key
     Data.Type.Equality.Key

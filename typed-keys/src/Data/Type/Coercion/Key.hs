@@ -18,7 +18,7 @@
 -- <https://people.seas.harvard.edu/~pbuiras/publications/KeyMonadHaskell2016.pdf The Key Monad: Type-Safe Unconstrained Dynamic Typing>
 -- by Atze van der Ploeg, Koen Claessen, and Pablo Buiras
 
-module Data.Type.Equality.Key
+module Data.Type.Coercion.Key
   ( Key, newKey, KeyM
   , Box(Lock), unlock, BoxM
   ) where
@@ -26,6 +26,7 @@ module Data.Type.Equality.Key
 import Control.Monad.Primitive
 import Data.Primitive.MutVar
 import Data.Proxy
+import Data.Type.Coercion
 import Data.Type.Equality
 import Unsafe.Coerce
 
@@ -33,7 +34,7 @@ import Unsafe.Coerce
 newtype Key s a = Key (MutVar s (Proxy a))
   deriving Eq
 
-type role Key nominal nominal
+type role Key nominal representational
 
 type KeyM m = Key (PrimState m)
 
@@ -42,6 +43,12 @@ instance TestEquality (Key s) where
     | s == unsafeCoerce t = Just (unsafeCoerce Refl)
     | otherwise           = Nothing
   {-# inline testEquality #-}
+
+instance TestCoercion (Key s) where
+  testCoercion (Key s :: Key s a) (Key t)
+    | s == unsafeCoerce t = Just $ unsafeCoerce (Coercion :: Coercion a a)
+    | otherwise           = Nothing
+  {-# inline testCoercion #-}
 
 newKey :: PrimMonad m => m (KeyM m a)
 newKey = Key <$> newMutVar Proxy
