@@ -1,0 +1,33 @@
+cabal-version: 3.4
+name: refs
+version: 0
+synopsis: refs
+description: refs
+homepage: https://github.com/ekmett/haskell
+license: BSD-2-Clause OR Apache-2.0
+license-file: LICENSE.md
+author: Edward Kmett
+maintainer: Edward Kmett <ekmett@gmail.com>
+copyright: Copyright (c) 2020 Edward Kmett
+stability: experimental
+category: Data Structures
+build-type: Simple
+extra-doc-files: README.md, CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/ekmett/haskell
+  subdir: refs
+
+common base
+  build-depends: base >= 4.14 && < 5
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
+    -Wredundant-constraints -Widentities -Wmissing-export-lists
+
+library
+  import: base
+  build-depends: primitive
+  hs-source-dirs: src
+  exposed-modules:
+    Ref
