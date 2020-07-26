@@ -22,7 +22,6 @@ source-repository head
   subdir: sequences
 
 common base
-  visible: True
   default-language: Haskell2010
   build-depends:
     base >= 4.14 && < 5,
@@ -31,20 +30,9 @@ common base
     -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
     -Wredundant-constraints -Widentities -Wmissing-export-lists
 
-library common
-  import: base
-  hs-source-dirs: common
-  build-depends:
-    transformers
-  exposed-modules:
-    Aligned.Base
-    Aligned.Internal
-    Unaligned.Base
-    Unaligned.Internal
-
 library monoid-relative
   import: base
-  build-depends: sequences:common
+  build-depends: sequences
   hs-source-dirs: monoid-relative
   signatures: Delta
   exposed-modules:
@@ -53,7 +41,7 @@ library monoid-relative
 
 library group-relative
   import: base
-  build-depends: sequences:common, groups
+  build-depends: sequences, groups
   hs-source-dirs: group-relative
   signatures: Delta
   exposed-modules:
@@ -62,9 +50,10 @@ library group-relative
 
 library
   import: base
-  build-depends: sequences:common
-  reexported-modules:
-    Unaligned.Base,
-    Unaligned.Internal,
-    Aligned.Base,
+  build-depends: transformers
+  hs-source-dirs: common
+  exposed-modules:
+    Aligned.Base
     Aligned.Internal
+    Unaligned.Base
+    Unaligned.Internal
