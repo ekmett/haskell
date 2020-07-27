@@ -32,6 +32,7 @@ common base
 
 library monoid-relative
   import: base
+  visibility: public
   build-depends: sequences
   hs-source-dirs: monoid-relative
   signatures: Delta
@@ -41,6 +42,7 @@ library monoid-relative
 
 library group-relative
   import: base
+  visibility: public
   build-depends: sequences, groups
   hs-source-dirs: group-relative
   signatures: Delta
