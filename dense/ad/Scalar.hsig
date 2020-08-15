@@ -1,0 +1,19 @@
+{-# language KindSignatures #-}
+{-# language TypeFamilies #-}
+{-# language DataKinds #-}
+{-# language StandaloneKindSignatures #-}
+signature Scalar 
+  ( ScalarType
+  , Scalar
+  , IsKnownZero
+  , isKnownZero
+  ) where
+
+import GHC.Types
+
+data ScalarType
+data Scalar (s :: ScalarType)
+
+type family IsKnownZero (s :: ScalarType) :: Constraint 
+
+isKnownZero :: IsKnownZero s => Scalar s -> Bool

@@ -1,0 +1,133 @@
+cabal-version: 3.4
+name: dense
+version: 0
+synopsis: dense linear algebra via backpack
+description: dense linear algebra via backpack
+homepage: https://github.com/ekmett/haskell
+license: BSD-2-Clause OR Apache-2.0
+license-file: LICENSE.md
+author: Edward Kmett
+maintainer: Edward Kmett <ekmett@gmail.com>
+copyright: Copyright (c) 2020 Edward Kmett
+stability: experimental
+category: Math
+build-type: Simple
+extra-doc-files:
+  README.md,
+  CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/ekmett/haskell
+  subdir: dense
+
+common base
+  default-language: Haskell2010
+  build-depends:
+    base >= 4.14 && < 5,
+    ghc-prim,
+    lens
+
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
+    -Wno-redundant-constraints -Widentities -Wmissing-export-lists
+
+library core
+  import: base
+  hs-source-dirs: core
+  exposed-modules:
+    Vector.Class
+
+library scalars
+  import: base
+  hs-source-dirs: scalars
+  exposed-modules:
+    Float
+    Known
+    Unknown
+
+-- TODO: add another tier here for complex and quaternions here for use as both scalars and vectors
+
+library ad
+  import: base
+  hs-source-dirs: ad
+  signatures: Scalar
+  exposed-modules:
+    Dual
+
+library common-scalars
+  import: base
+  build-depends: dense:scalars, dense:ad
+  mixins: dense:ad (Dual as Dual.Known) requires (Scalar as Known)
+  mixins: dense:ad (Dual as Dual.Unknown) requires (Scalar as Unknown)
+  mixins: dense:ad (Dual as Dual.Float) requires (Scalar as Float)
+  reexported-modules:
+    Float,
+    Dual.Float,
+    Dual.Known,
+    Dual.Unknown,
+    Known,
+    Unknown
+
+library vectors
+  import: base
+  build-depends: dense:scalars, dense:core
+  hs-source-dirs: vectors
+  signatures: Scalar
+  exposed-modules: V2
+
+library matrices
+  import: base
+  build-depends: dense:vectors
+  reexported-modules: 
+  signatures: Scalar
+  mixins:
+    dense:vectors, 
+    dense:vectors (V2 as M22) requires (Scalar as V2)
+  reexported-modules:
+    V2, 
+    M22
+
+library common-matrices
+  import: base
+  build-depends: dense:common-scalars, dense:matrices
+  mixins: dense:matrices (V2 as Known.V2, M22 as Known.M22) requires (Scalar as Known)
+  mixins: dense:matrices (V2 as Unknown.V2, M22 as Unknown.M22) requires (Scalar as Unknown)
+  mixins: dense:matrices (V2 as Float.V2, M22 as Float.M22)  requires (Scalar as Float)
+  mixins: dense:matrices (V2 as Dual.Known.V2, M22 as Dual.Known.M22) requires (Scalar as Dual.Known)
+  mixins: dense:matrices (V2 as Dual.Unknown.V2, M22 as Dual.Unknown.M22) requires (Scalar as Dual.Unknown)
+  mixins: dense:matrices (V2 as Dual.Float.V2, M22 as Dual.Float.M22)  requires (Scalar as Dual.Float)
+  reexported-modules:
+    Float.M22,
+    Float.V2,
+    Dual.Float.M22,
+    Dual.Float.V2,
+    Dual.Known.M22,
+    Dual.Known.V2,
+    Dual.Unknown.M22,
+    Dual.Unknown.V2,
+    Known.M22,
+    Known.V2,
+    Unknown.M22,
+    Unknown.V2
+
+library
+  build-depends:
+    dense:core,
+    dense:common-scalars,
+    dense:common-matrices
+
+  reexported-modules:
+    Float as Dense.Float,
+    Float.V2 as Dense.Float.V2,
+    Dual.Float as Dense.Dual.Float,
+    Dual.Float.V2 as Dense.Dual.Float.V2,
+    Dual.Known as Dense.Dual.Known,
+    Dual.Known.V2 as Dense.Dual.Known.V2,
+    Dual.Unknown as Dense.Dual.Unknown,
+    Dual.Unknown.V2 as Dense.Dual.Unknown.V2,
+    Known as Dense.Known,
+    Known.V2 as Dense.Known.V2,
+    Unknown as Dense.Unknown,
+    Unknown.V2 as Dense.Unknown.V2,
+    Vector.Class as Dense.Vector.Class

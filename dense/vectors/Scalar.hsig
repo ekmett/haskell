@@ -1,0 +1,10 @@
+{-# language KindSignatures #-}
+{-# language TypeFamilies #-}
+{-# language DataKinds #-}
+signature Scalar 
+  ( ScalarType
+  , Scalar
+  ) where
+
+data ScalarType
+data Scalar (s :: ScalarType)
