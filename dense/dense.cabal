@@ -35,11 +35,14 @@ common base
 library core
   import: base
   hs-source-dirs: core
+  visibility: public
   exposed-modules:
     Vector.Class
+    Data.Type.Tuple
 
 library scalars
   import: base
+  visibility: public
   hs-source-dirs: scalars
   exposed-modules:
     Float
@@ -51,6 +54,7 @@ library scalars
 library ad
   import: base
   hs-source-dirs: ad
+  visibility: public
   signatures: Scalar
   exposed-modules:
     Dual
@@ -61,6 +65,7 @@ library common-scalars
   mixins: dense:ad (Dual as Dual.Known) requires (Scalar as Known)
   mixins: dense:ad (Dual as Dual.Unknown) requires (Scalar as Unknown)
   mixins: dense:ad (Dual as Dual.Float) requires (Scalar as Float)
+  visibility: public
   reexported-modules:
     Float,
     Dual.Float,
@@ -74,12 +79,14 @@ library vectors
   build-depends: dense:scalars, dense:core
   hs-source-dirs: vectors
   signatures: Scalar
+  visibility: public
   exposed-modules: V2
 
 library matrices
   import: base
   build-depends: dense:vectors
   reexported-modules: 
+  visibility: public
   signatures: Scalar
   mixins:
     dense:vectors, 
@@ -91,6 +98,7 @@ library matrices
 library common-matrices
   import: base
   build-depends: dense:common-scalars, dense:matrices
+  visibility: public
   mixins: dense:matrices (V2 as Known.V2, M22 as Known.M22) requires (Scalar as Known)
   mixins: dense:matrices (V2 as Unknown.V2, M22 as Unknown.M22) requires (Scalar as Unknown)
   mixins: dense:matrices (V2 as Float.V2, M22 as Float.M22)  requires (Scalar as Float)

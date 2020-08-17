@@ -17,7 +17,7 @@ type ScalarType = ()
 newtype Scalar (s :: ScalarType) = ScalarFloat Float
   deriving newtype (Eq,Ord,Show,Num,Floating,Fractional,Real,RealFloat,RealFrac)
 
-type family IsKnownZero (s :: ScalarType)
+type family IsKnownZero (s :: ScalarType) :: Constraint
 type instance IsKnownZero s = () :: Constraint
 
 isKnownZero :: IsKnownZero s => Scalar s -> Bool
