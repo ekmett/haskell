@@ -6,12 +6,16 @@
 {-# Language ViewPatterns #-}
 {-# Language PatternSynonyms #-}
 {-# Language EmptyCase #-}
-module Subst where
+{-# Language RankNTypes #-}
+module Nat where
 
 import Control.Category
 import Control.Monad (join)
+import Data.Function (on)
+import Data.Maybe (fromMaybe)
 import GHC.Types (Type)
 import Prelude hiding ((.),id,pred)
+import qualified Prelude
 
 -- judgments as types
 
@@ -23,6 +27,7 @@ data Nat
   = Z
   | S !Nat
   | Add !Nat !Nat
+  deriving Show
 
 -- brute force equivalences
 data Same :: Nat -> Nat -> Type where
@@ -49,54 +54,6 @@ instance Show (Same m n) where
   showsPrec d (Sum l r) = showParen (d > 10) $ showString "Sum " . showsPrec 11 l . showChar ' ' . showsPrec 11 r
   showsPrec d (Comp l r) = showParen (d > 10) $ showString "Comp " . showsPrec 11 l . showChar ' ' . showsPrec 11 r
 
-type family HeadNormal (n :: Nat) :: Nat where
-  HeadNormal 'Z = 'Z
-  HeadNormal ('S n) = 'S n
-  HeadNormal ('Add m n) = HeadNormalPlus m n
-
-type family HeadNormalPlus (n :: Nat) (m :: Nat) :: Nat where
-  HeadNormalPlus 'Z m = HeadNormal m
-  HeadNormalPlus ('S n) m = 'S ('Add n m)
-  HeadNormalPlus ('Add n m) o = HeadNormalPlus n ('Add m o)
-
-type family Pred (n :: Nat) :: Nat where
-  Pred ('S n) = n
-  Pred ('Add m n) = PredPlus m n
-  
-type family PredPlus (m :: Nat) (n :: Nat) :: Nat where
-  PredPlus 'Z m = Pred m
-  PredPlus ('S n) m = 'Add n m
-  PredPlus ('Add m n) o = PredPlus m ('Add n o)
-
-headNormal :: SNat n -> Same n (HeadNormal n)
-headNormal SZ = Id
-headNormal (SS _) = Id
-headNormal (SAdd m n) = headNormalPlus m n
-
-headNormalPlus :: SNat n -> SNat m -> Same ('Add n m) (HeadNormalPlus n m)
-headNormalPlus SZ m = headNormal m . Symm Z_Add
-headNormalPlus (SS _) _ = Symm S_Add
-headNormalPlus (SAdd n m) o = headNormalPlus n (SAdd m o) . Assoc
-
-pred :: SNat n -> Maybe (SNat (Pred n))
-pred SZ = Nothing
-pred (SS n) = Just n
-pred (SAdd m n) = predPlus m n 
-
-predPlus :: SNat n -> SNat m -> Maybe (SNat (PredPlus n m))
-predPlus SZ m = pred m
-predPlus (SS n) m = Just (SAdd n m)
-predPlus (SAdd n m) o = predPlus n (SAdd m o) 
-
--- use to match on these so we can pretend the Add stuff isn't here
-pattern VZ :: () => (HeadNormal n ~ 'Z) => SNat n
-pattern VZ <- (join (same . headNormal) -> SZ) -- where VZ = join (unsame . unheadNormal) SZ
-
-pattern VS :: () => (HeadNormal n ~ 'S n') => SNat n' -> SNat n
-pattern VS n' <- (join (same . headNormal) -> SS n')
-
-{-# complete VS, VZ #-}
-
 instance Category Same where
   id = Id
   Id . f = f
@@ -117,6 +74,71 @@ instance Show (SNat n) where
   showsPrec _ SZ = showString "SZ"
   showsPrec d (SS n) = showParen (d > 10) $ showString "SS " . showsPrec 11 n
   showsPrec d (SAdd n m) = showParen (d > 10) $ showString "SAdd " . showsPrec 11 n . showChar ' ' . showsPrec 11 m
+
+class KnownNat n where
+  snat :: SNat n
+
+instance KnownNat Z where
+  snat = SZ
+
+instance KnownNat n => KnownNat (S n) where
+  snat = SS snat
+
+instance (KnownNat n, KnownNat m) => KnownNat (Add n m) where
+  snat = SAdd snat snat
+
+withSNat :: SNat n -> (KnownNat n => r) -> r
+withSNat SZ f = f
+withSNat (SS n) f = withSNat n f
+withSNat (SAdd m n) f = withSNat m (withSNat n f)
+
+type family HeadNormal (n :: Nat) :: Nat where
+  HeadNormal 'Z = 'Z
+  HeadNormal ('S n) = 'S n
+  HeadNormal ('Add m n) = HeadNormalPlus m n
+
+type family HeadNormalPlus (n :: Nat) (m :: Nat) :: Nat where
+  HeadNormalPlus 'Z m = HeadNormal m
+  HeadNormalPlus ('S n) m = 'S ('Add n m)
+  HeadNormalPlus ('Add n m) o = HeadNormalPlus n ('Add m o)
+
+type family Pred (n :: Nat) :: Nat where
+  Pred ('S n) = n
+  Pred ('Add m n) = PredPlus m n
+
+type family PredPlus (m :: Nat) (n :: Nat) :: Nat where
+  PredPlus 'Z m = Pred m
+  PredPlus ('S n) m = 'Add n m
+  PredPlus ('Add m n) o = PredPlus m ('Add n o)
+
+headNormal :: SNat n -> Same n (HeadNormal n)
+headNormal SZ = Id
+headNormal (SS _) = Id
+headNormal (SAdd m n) = headNormalPlus m n
+
+headNormalPlus :: SNat n -> SNat m -> Same ('Add n m) (HeadNormalPlus n m)
+headNormalPlus SZ m = headNormal m . Symm Z_Add
+headNormalPlus (SS _) _ = Symm S_Add
+headNormalPlus (SAdd n m) o = headNormalPlus n (SAdd m o) . Assoc
+
+pred :: SNat n -> Maybe (SNat (Pred n))
+pred SZ = Nothing
+pred (SS n) = Just n
+pred (SAdd m n) = predPlus m n
+
+predPlus :: SNat n -> SNat m -> Maybe (SNat (PredPlus n m))
+predPlus SZ m = pred m
+predPlus (SS n) m = Just (SAdd n m)
+predPlus (SAdd n m) o = predPlus n (SAdd m o)
+
+-- use to match on these so we can pretend the Add stuff isn't here
+pattern VZ :: () => (HeadNormal n ~ 'Z) => SNat n
+pattern VZ <- (join (same . headNormal) -> SZ) -- where VZ = join (unsame . unheadNormal) SZ
+
+pattern VS :: () => (HeadNormal n ~ 'S n') => SNat n' -> SNat n
+pattern VS n' <- (join (same . headNormal) -> SS n')
+
+{-# complete VS, VZ #-}
 
 type family CanonicalPlus (n :: Nat) (m :: Nat) :: Nat where
   CanonicalPlus 'Z n = Canonical n
@@ -153,7 +175,7 @@ equate (SS _) SZ = Nothing
 class ActSame f where
   same :: Same n m -> f n -> f m
   unsame :: Same m n -> f n -> f m
-  unsame = same . Symm 
+  unsame = same . Symm
 
 instance ActSame SNat where
   same Id n = n
@@ -251,26 +273,55 @@ instance ActSame Fin where
   unsame (Sum l _) (FL n) = FL (unsame l n)
   unsame (Sum l r) (FR n k) = FR (unsame l n) (unsame r k)
 
-{-
-data E i j = E !(Fin i) (Open j)
+-- playing around at the value level with naturals equipped with Add
 
-data Open (f :: Nat -> Type) (j :: Nat) (i :: Nat) where
-  ENil  :: Open f Z i
-  ESnoc :: Open f i j -> f (i'+k) -> E i' j' -> Open f 
- 
-act :: E n m -> T (Add n k) -> T (Add m k)
+predNat :: Nat -> Maybe Nat
+predNat Z = Nothing
+predNat (S n) = Just n
+predNat (Add n m) = case predNat n of
+  Just n' -> Just (Add n' m)
+  Nothing -> predNat m
 
--- weaken :: E n m -> E (n + k) (m + k)
+instance Eq Nat where
+  (==) = (==) `on` toInteger
 
--- can I keep track of a number
+instance Ord Nat where
+  compare = compare `on` toInteger
 
-data T n where
-  S :: T n -> T (S n)
-  Z :: T (S n)
-  Lam :: T (S n) -> T n
- 
-  Lam (T' a)
-  App (T a) (T a)
+-- dumb naturals
+instance Num Nat where
+  Z + n = n
+  n + Z = n
+  n + m = Add n m
+  Z * n = Z
+  S n * m = n + (n * m)
+  n - m = fromInteger (toInteger n - toInteger m)
+  negate n = case predNat n of
+    Nothing -> Z
+    _ -> error "negative natural"
+  abs = id
+  signum Z = Z
+  signum (Add l r) = case signum l of
+    Z -> signum r
+    n -> n
+  fromInteger 0 = Z
+  fromInteger n
+    | n > 0 = S (fromInteger (n - 1))
+    | otherwise = error "negative natural"
 
-data Env 
--}
+instance Integral Nat where
+  toInteger Z = 0
+  toInteger (S n) = 1 + toInteger n
+  toInteger (Add n m) = toInteger n + toInteger m
+  quotRem a b = case quotRem (toInteger a) (toInteger b) of
+    (q,r) -> (fromInteger q, fromInteger r)
+
+instance Real Nat where
+  toRational = toRational . toInteger
+
+instance Enum Nat where
+  succ = S
+  pred = fromMaybe (error "pred 0") . predNat
+  toEnum = fromIntegral
+  fromEnum = value
+
