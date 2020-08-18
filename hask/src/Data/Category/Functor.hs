@@ -26,8 +26,9 @@ module Data.Category.Functor
   , ob
   , FunctorOf
   , contramap
-  , DomHack
+  , SelfDom
   , DefaultCat
+  , type (~>)
   , Nat(..)
   , Hom(..)
   ) where
@@ -38,9 +39,9 @@ import GHC.Types hiding (Nat)
 import Prelude hiding (Functor(..),map,id,(.))
 import Prelude qualified
 
-type family DomHack (f :: i -> j) (k :: Cat i) :: Cat i where
-  DomHack p p = Op p
-  DomHack f p = p
+type family SelfDom (f :: i -> j) (k :: Cat i) :: Cat i where
+  SelfDom p p = Op p
+  SelfDom f p = p
 
 type family DefaultCat (i :: Type) = (res :: Cat i) | res -> i
 type instance DefaultCat Type = (->)
@@ -53,7 +54,7 @@ class
   ) => Functor (f :: i -> j) where
 
   type Dom f :: Cat i
-  type Dom (f :: i -> j) = DomHack f (DefaultCat i)
+  type Dom (f :: i -> j) = SelfDom f (DefaultCat i)
 
   type Cod f :: Cat j
   type Cod (f :: i -> j) = DefaultCat j
@@ -71,34 +72,10 @@ contramap = map . unop
 class    (Functor f, Dom f ~ p, Cod f ~ q) => FunctorOf p q f | f -> p q
 instance (Functor f, Dom f ~ p, Cod f ~ q) => FunctorOf p q f
 
+type (f :: i -> j) ~> (g :: i -> j) = Nat (DefaultCat i) (DefaultCat j)
+
 data Nat (p :: Cat i) (q :: Cat j) (f :: i -> j) (g :: i -> j)
   = (FunctorOf p q f, FunctorOf p q g) => Nat { runNat :: forall a. Ob p a => q (f a) (g a) }
-
-newtype Hom (k :: Cat i) (a :: i) (b :: i) = Hom { runHom :: k a b }
-type role Hom representational nominal nominal
-
-
-{-
-instance Category k => Category (Hom k) where
-  type Ob (Hom k) = Ob k
-  type Op (Hom k) = Hom (Op k)
-  id = Hom id
-  Hom f . Hom g = Hom (f . g)
-  src (Hom f) = src f
-  tgt (Hom f) = tgt f
-  op (Hom f) = Hom (op f)
-  unop (Hom f) = Hom (unop f)
--}
-
-instance Category k => Functor (Hom k e :: i -> Type) where
-  type Dom (Hom k e) = k
-  type Cod (Hom k e) = (->)
-  map f (Hom g) = Hom (f . g)
-
-instance Category k => Functor (Hom k :: i -> i -> Type) where
-  type Dom (Hom k) = Op k
-  type Cod (Hom k) = Nat k (->)
-  map f = Nat \(Hom g) -> Hom (g . unop f)
 
 instance (Category p, Category q) => Category (Nat p q) where
   type Ob (Nat p q) = FunctorOf p q
@@ -118,6 +95,36 @@ instance (Category p, Category q) => Functor (Nat p q f) where
   type Dom (Nat p q f) = Nat p q
   type Cod (Nat p q f) = (->)
   map = (.)
+
+
+newtype Hom (k :: Cat i) (a :: i) (b :: i) = Hom { runHom :: k a b }
+type role Hom representational nominal nominal
+
+-- deriving instance Category k => Category (Hom k)
+{-
+instance Category k => Category (Hom k) where
+  type Ob (Hom k) = Ob k
+  type Op (Hom k) = Hom (Op k)
+  id = Hom id
+  Hom f . Hom g = Hom (f . g)
+  src (Hom f) = src f
+  tgt (Hom f) = tgt f
+  op (Hom f) = Hom (op f)
+  unop (Hom f) = Hom (unop f)
+-}
+
+
+
+instance Category k => Functor (Hom k e :: i -> Type) where
+  type Dom (Hom k e) = k
+  type Cod (Hom k e) = (->)
+  map f (Hom g) = Hom (f . g)
+
+instance Category k => Functor (Hom k :: i -> i -> Type) where
+  type Dom (Hom k) = Op k
+  type Cod (Hom k) = Nat k (->)
+  map f = Nat \(Hom g) -> Hom (g . unop f)
+
 
 instance Functor ((->) e)
 
