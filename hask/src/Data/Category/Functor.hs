@@ -34,6 +34,7 @@ module Data.Category.Functor
   ) where
 
 import Data.Category.Class
+import Data.Coerce
 import Data.Constraint
 import GHC.Types hiding (Nat)
 import Prelude hiding (Functor(..),map,id,(.))
@@ -96,7 +97,6 @@ instance (Category p, Category q) => Functor (Nat p q f) where
   type Cod (Nat p q f) = (->)
   map = (.)
 
-
 newtype Hom (k :: Cat i) (a :: i) (b :: i) = Hom { runHom :: k a b }
 type role Hom representational nominal nominal
 
@@ -113,12 +113,12 @@ instance Category k => Category (Hom k) where
   unop (Hom f) = Hom (unop f)
 -}
 
-
-
 instance Category k => Functor (Hom k e :: i -> Type) where
   type Dom (Hom k e) = k
   type Cod (Hom k e) = (->)
-  map f (Hom g) = Hom (f . g)
+  map = go where
+    go :: forall a b c. k b c -> Hom k a b -> Hom k a c
+    go = coerce ((.) :: k b c -> k a b -> k a c)
 
 instance Category k => Functor (Hom k :: i -> i -> Type) where
   type Dom (Hom k) = Op k
@@ -149,7 +149,7 @@ instance Functor ((:-) e) where
   map = (.)
 
 instance Functor (:-) where
-  map (Y f) = Nat (. f)
+  map f = Nat (. unop f)
 
 instance Functor ((,) e)
 instance Functor (Either e)
