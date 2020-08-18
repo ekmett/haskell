@@ -21,6 +21,7 @@
 {-# Language DerivingVia #-}
 {-# Language BlockArguments #-}
 {-# Language RoleAnnotations #-}
+{-# Language LambdaCase #-}
 module Data.Category.Functor
   ( Functor(..)
   , ob
@@ -36,6 +37,7 @@ module Data.Category.Functor
 import Data.Category.Class
 import Data.Coerce
 import Data.Constraint
+import Data.These
 import GHC.Types hiding (Nat)
 import Prelude hiding (Functor(..),map,id,(.))
 import Prelude qualified
@@ -158,6 +160,14 @@ instance Functor Prelude.Maybe
 instance Functor IO
 instance Functor (,) where
   map f = Nat \(a,b) -> (f a, b)
+
+instance Functor These where
+  map f = Nat \case
+    This a -> This (f a)
+    These a b -> These (f a) b
+    That b -> That b
+
+instance Functor (These a)
 
 instance Functor Either where
   map f0 = Nat (go f0) where

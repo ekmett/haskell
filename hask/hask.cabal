@@ -26,7 +26,8 @@ common base
   build-depends:
     base >= 4.14 && < 5,
     constraints,
-    ghc-prim
+    ghc-prim,
+    these
   ghc-options:
     -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
     -Wno-redundant-constraints -Widentities -Wmissing-export-lists
@@ -37,3 +38,4 @@ library
   exposed-modules:
     Data.Category.Class
     Data.Category.Functor
+    Data.Category.Monoidal
