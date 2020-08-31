@@ -55,6 +55,7 @@ library
     Elaborate.Term
     Elaborate.Unification
     Elaborate.Value
+    Elaborate.Zonk
     Icit
     Names
     Source.Parser
