@@ -139,8 +139,13 @@ instance (Functor f, Dual f ~ Un2 f) => Functor (Un2 f) where
 -- type (~>) = (forall i. DefaultCat i)
 -- type family (~>) :: i -> i -> Type where (~>) = DefaultCat i 
 
-data Nat (p :: Cat i) (q :: Cat j) (f :: i -> j) (g :: i -> j)
-  = (Functor p q f, Functor p q g) => Nat { runNat :: forall a. Ob p a => q (f a) (g a) }
+data Nat 
+  (p :: Cat i) 
+  (q :: Cat j)
+  (f :: i -> j)
+  (g :: i -> j)
+  = (Functor p q f, Functor p q g) => Nat { runNat :: 
+    forall a. Ob p a => q (f a) (g a) }
 
 instance (Category p, Category q) => Category (Nat p q) where
   type Ob (Nat p q) = Functor p q

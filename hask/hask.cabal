@@ -38,4 +38,5 @@ library
   exposed-modules:
     Data.Category.Class
     Data.Category.Functor
-    Data.Category.Monoidal
+--    Data.Category.FunctorOf
+--    Data.Category.Monoidal
