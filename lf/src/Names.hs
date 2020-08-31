@@ -16,6 +16,8 @@ import Data.Hashable
 import Data.HashMap.Strict qualified as HM
 import Control.Monad.Trans.State.Strict
 
+-- todo: ShortText or interning
+
 type Name = String
 
 names :: [Name]
