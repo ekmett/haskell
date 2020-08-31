@@ -10,7 +10,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Elaborate.Occurrence 
+module Ergo.Elaborate.Occurrence 
   ( Occurs(..)
   , occurs
   , occurrence
@@ -21,9 +21,9 @@ import Control.Applicative (liftA2)
 --import Control.Monad.Primitive
 --import Control.Monad.ST
 import Data.HashSet qualified as HS
-import Elaborate.Evaluation
-import Elaborate.Monad
-import Elaborate.Value
+import Ergo.Elaborate.Evaluation
+import Ergo.Elaborate.Monad
+import Ergo.Elaborate.Value
 
 data Occurs s
   = Rigid          -- ^ At least one occurrence is not in the spine of any meta.

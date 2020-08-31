@@ -9,7 +9,7 @@
 {-# Language GADTs #-}
 {-# Language ScopedTypeVariables #-}
 {-# Language TypeApplications #-}
-module Elaborate.Unification where
+module Ergo.Elaborate.Unification where
 
 import Control.Exception
 import Control.Lens hiding (Context)
@@ -18,13 +18,13 @@ import Data.Foldable (forM_)
 import Data.HashSet qualified as HS
 import Data.HashMap.Strict qualified as HM
 import Data.Maybe (isJust)
-import Elaborate.Evaluation
-import Elaborate.Term
-import Elaborate.Value
-import Elaborate.Monad
-import Elaborate.Occurrence
-import Icit
-import Names
+import Ergo.Elaborate.Evaluation
+import Ergo.Elaborate.Term
+import Ergo.Elaborate.Value
+import Ergo.Elaborate.Monad
+import Ergo.Elaborate.Occurrence
+import Ergo.Icit
+import Ergo.Names
 
 type TM s = Tm (Meta s)
 type TY s = Ty (Meta s)

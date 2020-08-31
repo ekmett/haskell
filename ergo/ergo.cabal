@@ -47,18 +47,18 @@ library
   hs-source-dirs: src
   exposed-modules:
     Control.Monad.Sharing
-    Elaborate.Check
-    Elaborate.Error
-    Elaborate.Evaluation
-    Elaborate.Monad
-    Elaborate.Occurrence
-    Elaborate.Term
-    Elaborate.Unification
-    Elaborate.Value
-    Elaborate.Zonk
-    Icit
-    Names
-    Source.Parser
-    Source.Term
-    Unique
-    Use
+    Ergo.Elaborate.Check
+    Ergo.Elaborate.Error
+    Ergo.Elaborate.Evaluation
+    Ergo.Elaborate.Monad
+    Ergo.Elaborate.Occurrence
+    Ergo.Elaborate.Term
+    Ergo.Elaborate.Unification
+    Ergo.Elaborate.Value
+    Ergo.Elaborate.Zonk
+    Ergo.Icit
+    Ergo.Names
+    Ergo.Source.Parser
+    Ergo.Source.Term
+    Ergo.Unique
+    Ergo.Use

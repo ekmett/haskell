@@ -7,13 +7,10 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Elaborate.Check where
+module Ergo.Elaborate.Check where
 
 import Data.HashSet qualified as HS
---import Elaborate.Error
---import Elaborate.Term
-import Elaborate.Value
---import Source.Term qualified as Raw
+import Ergo.Elaborate.Value
 
 data Occurs s
   = Rigid          -- ^ At least one occurrence is not in the spine of any meta.

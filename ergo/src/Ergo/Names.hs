@@ -8,7 +8,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Names (Name, naming, metaNaming) where
+module Ergo.Names (Name, naming, metaNaming) where
 
 import Control.Lens (review)
 import Numeric.Lens (base)

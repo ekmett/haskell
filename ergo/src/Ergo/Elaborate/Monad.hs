@@ -13,7 +13,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Elaborate.Monad where
+module Ergo.Elaborate.Monad where
 
 import Control.Applicative (liftA2)
 import Control.Monad.Catch

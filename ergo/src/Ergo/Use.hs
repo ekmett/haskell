@@ -10,7 +10,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Use
+module Ergo.Use
   ( Use(..)
   , ω 
   , Scalable(..)
@@ -21,39 +21,8 @@ module Use
 -- * Use
 --------------------------------------------------------------------------------
 
-pattern Zero :: Use
-pattern Zero = USE 0
-
-pattern One :: Use
-pattern One = USE 1
-
-pattern Many :: Use
-pattern Many = USE 2
-
-data Use = USE Int
-  deriving (Eq,Ord)
-
-instance Enum Use where
-  fromEnum (USE n) = n
-
-  toEnum 0 = Zero
-  toEnum 1 = One
-  toEnum 2 = Many
-  toEnum _ = error "toEnum @Use: out of bounds"
-
-  succ Zero = One
-  succ One = Many
-  succ Many = error "succ @Use ω"
-
-  pred Zero = error "pred @Use 0"
-  pred One = Zero
-  pred Many = One
-
-instance Bounded Use where
-  minBound = Zero
-  maxBound = Many
-
-{-# COMPLETE Zero, One, Many #-}
+data Use = Zero | One | Many
+  deriving (Eq,Ord,Enum,Bounded)
 
 instance Show Use where
   showsPrec _ Zero = showChar '0'
@@ -99,7 +68,7 @@ instance Scalable (Used t) where
   scale One u = u
   scale n (n' :* t) = (n*n') :* t
 
-data Used t a = {-# UNPACK #-} !Use :* t a
+data Used t a = !Use :* t a
   deriving (Functor, Foldable, Show)
 
 infixr 8 :*

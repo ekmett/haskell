@@ -8,7 +8,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Elaborate.Error where
+module Ergo.Elaborate.Error where
 
 --import Text.Megaparsec (SourcePos)
 -- import Control.Monad.ST

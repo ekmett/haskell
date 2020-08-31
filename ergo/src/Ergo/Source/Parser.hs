@@ -10,20 +10,20 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Source.Parser where
+module Ergo.Source.Parser where
 
 import Control.Monad (guard)
 import Data.Char
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.Void (Void)
+import Ergo.Icit
+import Ergo.Names
+import Ergo.Source.Term
 import Prelude hiding (pi)
-import Source.Term
 import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
-import Names
-import Icit
 
 type Parser = Parsec Void String
 

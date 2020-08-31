@@ -10,20 +10,19 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Elaborate.Value where
+module Ergo.Elaborate.Value where
 
 import Control.Lens hiding (Context)
 import Control.Monad.Primitive
---import Control.Monad.ST
 import Data.Hashable
 import Data.HashSet
 import Data.Primitive.MutVar
-import Elaborate.Monad
+import Ergo.Elaborate.Monad
+import Ergo.Icit
+import Ergo.Names
+import Ergo.Unique
 import GHC.Exception
 import GHC.Stack.Types
-import Names
-import Icit
-import Unique
 
 panic :: HasCallStack => a
 panic = throw (errorCallWithCallStackException "impossible" ?callStack)

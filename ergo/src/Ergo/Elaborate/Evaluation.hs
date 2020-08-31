@@ -11,14 +11,14 @@
 
 -- QLF.Elaborate.Evaluation
 
-module Elaborate.Evaluation where
+module Ergo.Elaborate.Evaluation where
 
 import Data.Functor ((<&>))
-import Elaborate.Monad
-import Elaborate.Term
-import Elaborate.Value
-import Icit
-import Names
+import Ergo.Elaborate.Monad
+import Ergo.Elaborate.Term
+import Ergo.Elaborate.Value
+import Ergo.Icit
+import Ergo.Names
 
 valsLen :: Vals s -> Int
 valsLen = go 0 where
