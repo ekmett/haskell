@@ -8,7 +8,7 @@ watch:
 	@ghcid
 
 uninstall: 
-	@rm -rf ../dist-newstyle/build/x86_64-osx/ghc-8.10.1/lf-0/
+	@rm -rf ../dist-newstyle/build/*/*/ergo-0/
 
 over: uninstall build
 
