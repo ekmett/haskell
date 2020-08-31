@@ -31,7 +31,7 @@ valsLen = go 0 where
 evalProj1 :: Val s -> M s (Val s)
 evalProj1 (VTcons t _) = pure t
 evalProj1 (VNe h sp) = pure $ VNe h (SProj1 sp)
-evalProj1 (VLamTel x a t) = evalLamTel pure x a t >>= evalProj1 
+evalProj1 (VLamTel x a t) = evalLamTel pure x a t >>= evalProj1
 evalProj1 _ = panic
 
 evalProj2 :: Val s -> M s (Val s)
@@ -47,8 +47,8 @@ evalVar x (VDef vs _) = evalVar (x - 1) vs
 evalVar x (VSkip vs) = evalVar (x - 1) vs
 evalVar _ _ = panic
 
-evaleta :: Meta s -> M s (Val s)
-evaleta m = readMeta m <&> \case
+evalMeta :: Meta s -> M s (Val s)
+evalMeta m = readMeta m <&> \case
   Unsolved{} -> VMeta m
   Solved v -> v
   _ -> panic
@@ -60,14 +60,14 @@ evalPiTel k x a0 b = force a0 >>= \case
     let x' = x ++ "1"
         x'' = x ++ "2"
     in VPi x' Implicit a \ ~x1 -> do
-      ~x1v <- as x1 
+      ~x1v <- as x1
       evalPiTel pure x'' x1v \ ~x2 -> b (VTcons x1 x2)
   a -> pure $ VPiTel x a b
 
 evalLamTel :: EVal s -> Name -> VTy s -> EVal s -> M s (Val s)
 evalLamTel k x a0 t = force a0 >>= \case
   VTNil -> t VTnil >>= k
-  VTCons _ a as -> pure 
+  VTCons _ a as -> pure
     let x' = x ++ "1"
         x'' = x ++ "2"
     in VLam x' Implicit a \ ~x1 -> do
@@ -82,7 +82,7 @@ evalAppTel a0 t u = force a0 >>= \case
     u1 <- evalProj1 u
     u1v <- as u1
     u2 <- evalProj2 u
-    t' <- evalApp Implicit t u1 
+    t' <- evalApp Implicit t u1
     evalAppTel u1v t' u2
   a -> case t of
     VNe h sp -> pure $ VNe h (SAppTel a sp u)
@@ -90,10 +90,10 @@ evalAppTel a0 t u = force a0 >>= \case
     _ -> panic
 
 evalApp :: Icit -> Val s -> Val s -> M s (Val s)
-evalApp _ (VLam _ _ _ t)  ~u = t u
-evalApp i (VNe h sp)      ~u = pure $ VNe h (SApp i sp u)
-evalApp i (VLamTel x a t) ~u = do
-  y <- evalLamTel pure x a t 
+evalApp _ (VLam _ _ _ t)  u = t u
+evalApp i (VNe h sp)      u = pure $ VNe h (SApp i sp u)
+evalApp i (VLamTel x a t) u = do
+  y <- evalLamTel pure x a t
   evalApp i y u
 evalApp _                _ _ = panic
 
@@ -114,7 +114,7 @@ force = \case
   VPiTel x a b -> evalPiTel force x a b
   VLamTel x a t -> evalLamTel force x a t
   v -> pure v
-    
+
 forceSp :: Spine s -> M s (Spine s)
 forceSp sp =
   -- This is a cheeky hack, the point is that (VVar (-1)) blocks computation, and
@@ -130,31 +130,31 @@ eval vs = go where
     Var x        -> pure $ evalVar x vs
     Let _ _ t u  -> go t >>= goBind u
     U            -> pure VU
-    Meta m       -> evaleta m
-    Pi x i a b   -> go a <&> \a' -> VPi x i a' (goBind b)
-    Lam x i a t  -> go a <&> \a' -> VLam x i a' (goBind t)
+    Meta m       -> evalMeta m
+    Pi x i a b   -> unsafeInterleaveM (go a) <&> \a' -> VPi x i a' (goBind b)
+    Lam x i a t  -> unsafeInterleaveM (go a) <&> \a' -> VLam x i a' (goBind t)
     App i t u    -> do
-      t' <- go t
-      u' <- go u 
+      t' <- unsafeInterleaveM (go t)
+      u' <- unsafeInterleaveM (go u)
       evalApp i t' u'
     Tel          -> pure VTel
     TNil         -> pure VTNil
-    TCons x a b  -> go a <&> \a' -> VTCons x a' (goBind b)
+    TCons x a b  -> unsafeInterleaveM (go a) <&> \a' -> VTCons x a' (goBind b)
     Rec a        -> VRec <$> go a
     Tnil         -> pure VTnil
-    Tcons t u    -> VTcons <$> go t <*> go u
+    Tcons t u    -> VTcons <$> unsafeInterleaveM (go t) <*> unsafeInterleaveM (go u)
     Proj1 t      -> go t >>= evalProj1
     Proj2 t      -> go t >>= evalProj2
     PiTel x a b  -> do
-      a' <- go a
+      a' <- unsafeInterleaveM (go a)
       evalPiTel pure x a' (goBind b)
     AppTel a t u -> do
-      a' <- go a
-      t' <- go t
-      u' <- go u
+      a' <- unsafeInterleaveM (go a)
+      t' <- unsafeInterleaveM (go t)
+      u' <- unsafeInterleaveM (go u)
       evalAppTel a' t' u'
     LamTel x a t -> do
-      a' <- go a
+      a' <- unsafeInterleaveM (go a)
       evalLamTel pure x a' (goBind t)
     Skip t -> eval (VSkip vs) t
 
@@ -185,7 +185,7 @@ uneval d = go where
     VPiTel x a b  -> PiTel x <$> go a <*> goBind b
     VLamTel x a t -> LamTel x <$> go a <*> goBind t
 
-  goBind t = t (VVar d) >>= uneval (d + 1) 
+  goBind t = t (VVar d) >>= uneval (d + 1)
 
 nf :: Vals s -> Tm (Meta s) -> M s (Tm (Meta s))
 nf vs t = do

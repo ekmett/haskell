@@ -115,19 +115,19 @@ strengthen str0 = go where
 
               go' (True:pr) str z = force z >>= \case
                 VPi x i a b -> do
-                  r <- b $ VVar (str^.cod)
+                  r <- unsafeInterleaveM $ b $ VVar (str^.cod)
                   Pi x i <$> strengthen str a <*> go' pr (liftStr str) r
                 VPiTel x a b ->do
-                  r <- b $ VVar (str^.cod)
+                  r <- unsafeInterleaveM $ b $ VVar (str^.cod)
                   PiTel x <$> strengthen str a <*> go' pr (liftStr str) r
                 _ -> panic
 
               go' (False:pr) str z = force z >>= \case
                 VPi _ _ _ b -> do
-                  r <- b $ VVar (str^.cod)
+                  r <- unsafeInterleaveM $ b $ VVar (str^.cod)
                   go' pr (skipStr str) r
                 VPiTel _ _ b -> do
-                  r <- b $ VVar (str^.cod)
+                  r <- unsafeInterleaveM $ b $ VVar (str^.cod)
                   go' pr (skipStr str) r
                 _ -> panic
 
@@ -142,43 +142,46 @@ strengthen str0 = go where
               go' (True:pr) z acc d = do
                 force z >>= \case 
                   VPi _ i _ b -> do
-                    a' <- b (VVar d)
+                    a' <- unsafeInterleaveM $ b (VVar d)
                     go' pr a' (App i acc (Var (argNum - d - 1))) (d + 1)
                   VPiTel _ a b -> do
-                    a' <- b (VVar d)
-                    u <- uneval argNum a
+                    a' <- unsafeInterleaveM $ b (VVar d)
+                    u <- unsafeInterleaveM $ uneval argNum a
                     go' pr a' (AppTel u acc (Var (argNum - d - 1))) (d + 1)
                   _ -> panic 
               go' (False:pr) z acc d = do
                 force z >>= \case
                   VPi _ _ _ b -> do
-                    a' <- b (VVar d)
+                    a' <- unsafeInterleaveM $ b (VVar d)
                     go' pr a' acc (d + 1)
                   VPiTel _ _ b -> do
-                    a' <- b (VVar d)
+                    a' <- unsafeInterleaveM $ b (VVar d)
                     go' pr a' acc (d + 1)
                   _ -> panic
 
         b <- body
-        rhs <- closingTm metaTy argNum [] b
-        erhs <- eval VNil rhs 
-        writeMeta m $ Solved erhs
+        rhs <- unsafeInterleaveM do
+          rhs <- closingTm metaTy argNum [] b
+          eval VNil rhs 
+        writeMeta m $ Solved rhs
 
   go :: Val s -> M s (TM s)
   go t = force t >>= \case
     VNe (HVar x) sp  -> case HM.lookup x (str0^.ren) of
                           Nothing -> throwM $ ScopeError x
-                          Just x' -> forceSp sp >>= goSp (Var (str0^.dom - x' - 1))
+                          Just x' -> do
+                            y <- unsafeInterleaveM (forceSp sp)
+                            goSp (Var (str0^.dom - x' - 1)) y
     VNe (HMeta m0) sp -> if Just m0 == str0^.occ then
                           throwM OccursCheck
                         else do
                           prune m0 sp
                           force (VNe (HMeta m0) sp) >>= \case
                             VNe (HMeta m') sp' -> goSp (Meta m') sp'
-                            _                -> panic
+                            _ -> panic
 
     VPi x i a b      -> Pi x i <$> go a <*> goBind b
-    VLam x i a t'     -> Lam x i <$> go a <*> goBind t'
+    VLam x i a t'    -> Lam x i <$> go a <*> goBind t'
     VU               -> pure U
     VTel             -> pure Tel
     VRec a           -> Rec <$> go a
@@ -369,9 +372,10 @@ unify :: forall s. Context s -> Val s -> Val s -> M s ()
 --unify = undefined
 unify cxt l r = go l r where
 
-  unifyError = undefined
-
-   -- throwIO $ UnifyError (cxt^.names) (quote (cxt^.len) l) (quote (cxt^.len) r)
+  unifyError = do
+    l' <- unsafeInterleaveM $ uneval (cxt^.len) l
+    r' <- unsafeInterleaveM $ uneval (cxt^.len) r
+    throwM $ UnifyError (cxt^.names) l' r'
 
   -- if both sides are meta-headed, we simply try to check both spines
   flexFlex m sp m' sp' = do
@@ -415,13 +419,14 @@ unify cxt l r = go l r where
       ib <- implArity cxt b'
       if ia <= ib then do
         let cxt' = bindSrc x' a' cxt
-        m <- freshMeta cxt' VTel
-        vm <- eval (cxt'^.vals) m -- interleave?
+        vm <- unsafeInterleaveM do
+          m <- freshMeta cxt' VTel
+          eval (cxt'^.vals) m
         go a $ VTCons x' a' $ liftVal cxt vm
         let b2 ~x1 ~x2 = b (VTcons x1 x2)
         newConstancy cxt' vm $ b2 $ VVar (cxt^.len)
         goBind x' a' 
-          (\ ~x1 -> liftVal cxt vm x1 <&> \t' -> VPiTel x t' (b2 x1)) b'
+          (\ ~x1 -> unsafeInterleaveM (liftVal cxt vm x1) <&> \t' -> VPiTel x t' (b2 x1)) b'
       else do
         go a VTNil
         r' <- b VTnil
@@ -432,12 +437,13 @@ unify cxt l r = go l r where
       ib <- implArity cxt b'
       if ia <= ib then do
         let cxt' = bindSrc x' a' cxt
-        m <- freshMeta cxt' VTel
-        vm <- eval (cxt'^.vals) m -- interleave?
+        vm <- unsafeInterleaveM do
+          m <- freshMeta cxt' VTel
+          eval (cxt'^.vals) m -- interleave?
         go a $ VTCons x' a' $ liftVal cxt vm
         let b2 ~x1 ~x2 = b (VTcons x1 x2)
         newConstancy cxt' vm $ b2 $ VVar (cxt^.len)
-        goBind x' a' b' \ ~x1 -> liftVal cxt vm x1 <&> \t' -> VPiTel x t' (b2 x1)
+        goBind x' a' b' \ ~x1 -> unsafeInterleaveM (liftVal cxt vm x1) <&> \t' -> VPiTel x t' (b2 x1)
       else do
         go a VTNil
         r' <- b VTnil

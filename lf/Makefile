@@ -12,4 +12,10 @@ uninstall:
 
 over: uninstall build
 
-.PHONY: build install watch uninstall over
+tags: $(wildcard **/*.hs)
+	@fast-tags -R src
+
+clean:
+	@rm tags
+
+.PHONY: build install watch uninstall over clean
