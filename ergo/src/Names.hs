@@ -11,7 +11,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Names 
+module Names 
   ( SourceName
   , Name(..)
   , naming
@@ -25,7 +25,7 @@ import Control.Monad.Trans.State.Strict
 import Data.HashMap.Strict qualified as HM
 import Data.Hashable
 import Data.Text.Short as Short
-import Ergo.Unique
+import Unique
 import Numeric.Lens (base)
 import Data.String
 import GHC.Generics

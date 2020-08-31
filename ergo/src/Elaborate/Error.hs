@@ -11,15 +11,15 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Elaborate.Error where
+module Elaborate.Error where
 
 import Control.Exception
 import Control.Monad.Catch as M
-import Ergo.Elaborate.Monad
-import Ergo.Elaborate.Term
-import Ergo.Elaborate.Value
-import Ergo.Icit
-import Ergo.Names
+import Elaborate.Monad
+import Elaborate.Term
+import Elaborate.Value
+import Icit
+import Names
 import Text.Megaparsec (SourcePos)
 
 data SpineError

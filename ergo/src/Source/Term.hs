@@ -6,10 +6,10 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Source.Term where
+module Source.Term where
 
-import Ergo.Icit
-import Ergo.Names
+import Icit
+import Names
 import Text.Megaparsec (SourcePos)
 
 data Term

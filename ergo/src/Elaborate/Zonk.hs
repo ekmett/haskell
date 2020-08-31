@@ -1,13 +1,13 @@
 {-# Language ScopedTypeVariables #-}
 {-# Language LambdaCase #-}
 
-module Ergo.Elaborate.Zonk where
+module Elaborate.Zonk where
 
 import Data.Functor ((<&>))
-import Ergo.Elaborate.Evaluation
-import Ergo.Elaborate.Term
-import Ergo.Elaborate.Value
-import Ergo.Elaborate.Monad
+import Elaborate.Evaluation
+import Elaborate.Term
+import Elaborate.Value
+import Elaborate.Monad
 
 -- | Unfold all metas and evaluate meta-headed spines, but don't evaluate
 --   anything else.

@@ -18,7 +18,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Elaborate.Unification where
+module Elaborate.Unification where
 
 import Control.Lens hiding (Context)
 import Control.Monad.Catch as M
@@ -26,14 +26,14 @@ import Data.Foldable (forM_)
 import Data.HashSet qualified as HS
 import Data.HashMap.Strict qualified as HM
 import Data.Maybe (isJust)
-import Ergo.Elaborate.Error
-import Ergo.Elaborate.Evaluation
-import Ergo.Elaborate.Term
-import Ergo.Elaborate.Value
-import Ergo.Elaborate.Monad
-import Ergo.Elaborate.Occurrence
-import Ergo.Icit
-import Ergo.Names
+import Elaborate.Error
+import Elaborate.Evaluation
+import Elaborate.Term
+import Elaborate.Value
+import Elaborate.Monad
+import Elaborate.Occurrence
+import Icit
+import Names
 
 lvlName :: Int -> [Name s] -> Lvl -> Name s
 lvlName ln ns x = ns !! (ln - x - 1)

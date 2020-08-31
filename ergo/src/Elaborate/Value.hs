@@ -10,17 +10,17 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Elaborate.Value where
+module Elaborate.Value where
 
 import Control.Lens hiding (Context)
 import Control.Monad.Primitive
 import Data.Hashable
 import Data.HashSet
 import Data.Primitive.MutVar
-import Ergo.Elaborate.Monad
-import Ergo.Icit
-import Ergo.Names
-import Ergo.Unique
+import Elaborate.Monad
+import Icit
+import Names
+import Unique
 import GHC.Exception
 import GHC.Stack.Types
 

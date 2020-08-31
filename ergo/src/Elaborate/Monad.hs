@@ -17,7 +17,7 @@
 -- that we're willing and able to interleave computations lazily
 -- as well as willing to throw, catch and mask exceptions in 'M'.
 
-module Ergo.Elaborate.Monad where
+module Elaborate.Monad where
 
 import Control.Applicative (liftA2)
 import Control.Monad.Catch

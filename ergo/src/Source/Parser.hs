@@ -10,7 +10,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Source.Parser where
+module Source.Parser where
 
 import Control.Monad (guard)
 import Data.Char
@@ -18,9 +18,9 @@ import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.String 
 import Data.Void (Void)
-import Ergo.Icit
-import Ergo.Names
-import Ergo.Source.Term
+import Icit
+import Names
+import Source.Term
 import Prelude hiding (pi)
 import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C

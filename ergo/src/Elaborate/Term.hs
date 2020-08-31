@@ -5,11 +5,11 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Elaborate.Term where
+module Elaborate.Term where
 
-import Ergo.Elaborate.Value
-import Ergo.Names
-import Ergo.Icit
+import Elaborate.Value
+import Names
+import Icit
 
 type Ty = Tm
 type Ix = Int

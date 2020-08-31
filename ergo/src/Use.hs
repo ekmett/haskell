@@ -10,7 +10,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Use
+module Use
   ( Use(..)
   , ω 
   , Scalable(..)

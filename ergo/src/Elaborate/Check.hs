@@ -10,19 +10,19 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Elaborate.Check where
+module Elaborate.Check where
 
 import Control.Monad (unless)
 import Control.Lens hiding (Context)
-import Ergo.Elaborate.Error
-import Ergo.Elaborate.Evaluation
-import Ergo.Elaborate.Monad
-import Ergo.Elaborate.Term
-import Ergo.Elaborate.Value
-import Ergo.Elaborate.Unification
-import Ergo.Icit
-import Ergo.Names
-import Ergo.Source.Term qualified as Raw
+import Elaborate.Error
+import Elaborate.Evaluation
+import Elaborate.Monad
+import Elaborate.Term
+import Elaborate.Value
+import Elaborate.Unification
+import Icit
+import Names
+import Source.Term qualified as Raw
 
 -- | Define a new variable.
 define :: Name s -> VTy s -> Val s -> Context s -> Context s

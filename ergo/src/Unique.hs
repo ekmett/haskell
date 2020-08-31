@@ -9,7 +9,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Unique 
+module Unique 
   ( Unique
   , UniqueM
   , newUnique

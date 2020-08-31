@@ -5,7 +5,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Ergo.Icit where
+module Icit where
 
 data Icit
   = Implicit
