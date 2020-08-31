@@ -95,6 +95,9 @@ newtype TaskT f m a
 deriving via (ReaderT (Nat f m) m) instance MonadBase t m => MonadBase t (TaskT f m)
 deriving via (ReaderT (Nat f m) m) instance MonadBaseControl t m => MonadBaseControl t (TaskT f m)
 
+instance MonadTrans (TaskT f) where
+  lift m = TaskT \_ -> m
+
 instance PrimMonad m => PrimMonad (TaskT f m) where
   type PrimState (TaskT f m) = PrimState m
   primitive k = TaskT \_ -> primitive k
