@@ -20,6 +20,7 @@
 {-# Language TypeFamilies #-}
 {-# Language TypeOperators #-}
 {-# Language UndecidableInstances #-}
+{-# Language UnicodeSyntax #-}
 {-# options_ghc -Wno-deprecations #-}
 
 -- |
@@ -73,7 +74,7 @@ import Data.Some
 import Data.Typeable
 import Text.Show.Deriving
 
-type f ~> g = forall a. f a -> g a
+type f ~> g = ∀ a. f a -> g a
 
 infixr 0 ~>
 
@@ -120,19 +121,24 @@ instance (MonadTask f m, Monoid w) => MonadTask f (Lazy.RWST r w s m)
 
 mapTask :: (f ~> g) -> TaskT f m ~> TaskT g m
 mapTask f (TaskT m) = TaskT \ c -> m (c . f)
+{-# inline mapTask #-}
 
 bindTask :: TaskT f m a -> (f ~> TaskT g m) -> TaskT g m a
 bindTask m k = TaskT \ c -> unTaskT m \ x -> unTaskT (k x) c
+{-# inline bindTask #-}
 
 -- TODO: go transform to pull out the recursion
-runTask :: (f ~> TaskT f m) -> TaskT f m ~> m
-runTask k m = unTaskT m (runTask k . k)
---{-# SPECIALIZE runTask :: (f ~> TaskT f IO m) -> TaskT f IO ~> IO #-}
+runTask :: ∀ f m. (f ~> TaskT f m) -> TaskT f m ~> m
+runTask k = go where 
+  go :: TaskT f m ~> m
+  go m = unTaskT m (go . k)
+{-# inline runTask #-}
 
 type GHashable f = (GEq f, Hashable (Some f))
 
-trackM :: (GHashable f, PrimMonad m)
-  => (forall b. f b -> b -> TaskT f m (g b))
+trackM
+  :: (GHashable f, PrimMonad m)
+  => (∀ b. f b -> b -> TaskT f m (g b))
   -> TaskT f m a -> TaskT f m (a, DHashMap f g)
 trackM f task = do 
   depsVar <- newMutVar mempty
@@ -143,12 +149,14 @@ trackM f task = do
       (DHM.insert key g m, ())
   (result,) <$> readMutVar depsVar
 
-track :: (GHashable f, PrimMonad m)
-  => (forall b. f b -> b -> g b)
+track
+  :: (GHashable f, PrimMonad m)
+  => (∀ b. f b -> b -> g b)
   -> TaskT f m a -> TaskT f m (a, DHashMap f g)
 track f = trackM \key -> pure . f key
 
-memoise :: (GHashable f, PrimMonad m)
+memoise 
+  :: (GHashable f, PrimMonad m)
   => MutVar (PrimState m) (DHashMap f (MVar (PrimState m)))
   -> (f ~> TaskT g m) -> f ~> TaskT g m
 memoise sv rules key = readMutVar sv >>= \v -> case DHM.lookup key v of
@@ -171,8 +179,7 @@ data MemoEntry s a
   | Done !a
 
 memoiseWithCycleDetection
-  :: forall f g m
-  . (PrimMonad m, MonadCatch m, Typeable f, GShow f, GHashable f)
+  :: ∀ f g m. (PrimMonad m, MonadCatch m, Typeable f, GShow f, GHashable f)
   => MutVar (PrimState m) (DHashMap f (MemoEntry (PrimState m)))
   -> MutVar (PrimState m) (HashMap ThreadId ThreadId)
   -> (f ~> TaskT g m) -> f ~> TaskT g m
@@ -189,16 +196,16 @@ memoiseWithCycleDetection startedVar depsVar rules = rules' where
       Nothing -> do
         threadId <- unsafeIOToPrim myThreadId
         valueVar <- newEmptyMVar
-        join $ atomicModifyMutVar startedVar \started ->
+        join $ atomicModifyMutVar' startedVar \started ->
           case DHM.alterLookup (Just . fromMaybe (Started threadId valueVar)) key started of
             (Just entry, _started') -> (started, waitFor entry)
             (Nothing, started') -> (,) started' $ do -- note `M.catch`
                 value <- rules key
                 stToPrim do
-                  atomicModifyMutVar startedVar \started'' -> (DHM.insert key (Done value) started'', ())
+                  atomicModifyMutVar' startedVar \started'' -> (DHM.insert key (Done value) started'', ())
                   value <$ putMVar valueVar (Just value)
               `M.catch` \(e :: Cyclic f) -> stToPrim do
-                atomicModifyMutVar startedVar \started'' -> (DHM.delete key started'', ())
+                atomicModifyMutVar' startedVar \started'' -> (DHM.delete key started'', ())
                 putMVar valueVar Nothing
                 throwM e
     where
@@ -206,13 +213,13 @@ memoiseWithCycleDetection startedVar depsVar rules = rules' where
         Done value -> pure value
         Started onThread valueVar -> do
           threadId <- unsafeIOToPrim myThreadId
-          join $ atomicModifyMutVar depsVar \deps ->
+          join $ atomicModifyMutVar' depsVar \deps ->
             let deps' = HM.insert threadId onThread deps in
             if detectCycle threadId deps' then (,) deps do
               unsafeIOToPrim $ throwIO $ Cyclic $ Some key
             else (,) deps' do
               maybeValue <- readMVar valueVar
-              atomicModifyMutVar depsVar \deps'' -> (HM.delete threadId deps'', ())
+              atomicModifyMutVar' depsVar \deps'' -> (HM.delete threadId deps'', ())
               maybe (rules' key) pure maybeValue
 
 data ValueDeps f d a = ValueDeps !a !(DHashMap f d)
@@ -224,9 +231,10 @@ instance (GShow f, Has' Show f d) => Show1 (ValueDeps f d) where
 
 type Traces f d = DHashMap f (ValueDeps f d)
 
-verifyDependencies :: (PrimMonad m, GEq f, Has' Eq f d)
+verifyDependencies 
+  :: (PrimMonad m, GEq f, Has' Eq f d)
   => (f ~> m)
-  -> (forall b. f b -> b -> m (d b))
+  -> (∀ b. f b -> b -> m (d b))
   -> ValueDeps f d a 
   -> m (Maybe a)
 verifyDependencies f createDependencyRecord (ValueDeps value_ deps) = do
@@ -266,8 +274,8 @@ instance GCompare f => GCompare (Traced w f) where
 -- | @'tracing' write rules@ runs @write w@ each time a @w@ is returned from a
 -- rule in @rules@.
 tracing 
-  :: forall f w g m. Monad m
-  => (forall a. f a -> w -> TaskT g m ())
+  :: ∀ f w g m. Monad m
+  => (∀ a. f a -> w -> TaskT g m ())
   -> (Traced w f ~> TaskT g m) -> f ~> TaskT g m
 tracing write rules key = do
   (res, w) <- rules $ Traced key
@@ -279,10 +287,9 @@ tracing write rules key = do
 -- If all dependencies of a 'NonInput' query are the same, reuse the old result.
 -- 'Input' queries are not reused.
 verifyTraces
-  :: forall f m d
-  . (PrimMonad m, MonadCatch m, GHashable f, Has' Eq f d, Typeable f, GShow f)
+  :: ∀ f m d. (PrimMonad m, MonadCatch m, GHashable f, Has' Eq f d, Typeable f, GShow f)
   => MutVar (PrimState m) (Traces f d)
-  -> (forall a. f a -> a -> TaskT f m (d a))
+  -> (∀ a. f a -> a -> TaskT f m (d a))
   -> (Traced TaskKind f ~> TaskT f m) -> f ~> TaskT f m
 verifyTraces tracesVar cdr r key = do
   traces <- readMutVar tracesVar
@@ -295,7 +302,7 @@ verifyTraces tracesVar cdr r key = do
       ((value, taskKind), deps) <- trackM cdr $ r $ Traced key
       value <$ case taskKind of
         Input -> pure ()
-        NonInput -> atomicModifyMutVar tracesVar \v -> (record key value deps v, ())
+        NonInput -> atomicModifyMutVar' tracesVar \v -> (record key value deps v, ())
     Just value -> pure value
 
 -- | @'traceFetch' before after rules@ runs @before q@ before a query is
@@ -303,8 +310,8 @@ verifyTraces tracesVar cdr r key = do
 -- result @result@. 
 traceFetch
   :: Monad m
-  => (forall a. f a -> TaskT g m ())
-  -> (forall a. f a -> a -> TaskT g m ())
+  => (∀ a. f a -> TaskT g m ())
+  -> (∀ a. f a -> a -> TaskT g m ())
   -> (f ~> TaskT g m) -> f ~> TaskT g m
 traceFetch before after rules key = do
   before key
@@ -325,7 +332,7 @@ trackReverseDependencies reverseDepsVar rules key = do
           [ (Some depKey, HS.singleton $ Some key)
           | depKey :=> Const () <- DHM.toList deps
           ]
-    atomicModifyMutVar reverseDepsVar \e -> (HM.unionWith (<>) newReverseDeps e, ())
+    atomicModifyMutVar' reverseDepsVar \e -> (HM.unionWith (<>) newReverseDeps e, ())
 
 -- | @'reachableReverseDependencies' key@ returns all keys reachable, by
 -- reverse dependency, from @key@ from the input 'DHashMap'. It also returns the
