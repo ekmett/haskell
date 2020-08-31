@@ -1,7 +1,7 @@
 lf
 ==
 
-A toy quantitative logical framework
+A toy (eventually) quantitative logical framework
 
 License
 -------
