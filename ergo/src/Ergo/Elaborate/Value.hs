@@ -78,7 +78,7 @@ data Context s
   = Context
    { _vals :: Vals s
    , _types :: Types s
-   , _names :: [Name]
+   , _names :: [Name s]
    , _nameOrigin :: [NameOrigin]
    , _len :: Int
    }
@@ -104,17 +104,17 @@ type VTy = Val
 
 data Val s
   = VNe !(Head s) !(Spine s)
-  | VPi !Name !Icit (VTy s) (EVTy s)
-  | VLam !Name !Icit (VTy s) (EVal s)
+  | VPi !(Name s) !Icit (VTy s) (EVTy s)
+  | VLam !(Name s) !Icit (VTy s) (EVal s)
   | VU
   | VTel
   | VRec (Val s)
   | VTNil
-  | VTCons !Name (Val s) (EVal s)
+  | VTCons !(Name s) (Val s) (EVal s)
   | VTnil
   | VTcons (Val s) (Val s)
-  | VPiTel !Name (Val s) (EVal s)
-  | VLamTel !Name (Val s) (EVal s)
+  | VPiTel !(Name s) (Val s) (EVal s)
+  | VLamTel !(Name s) (Val s) (EVal s)
 
 type EVal s = Val s -> M s (Val s)
 type EVTy s = VTy s -> M s (VTy s)

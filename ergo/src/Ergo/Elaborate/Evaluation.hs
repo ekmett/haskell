@@ -53,23 +53,21 @@ evalMeta m = readMeta m <&> \case
   Solved v -> v
   _ -> panic
 
-evalPiTel :: EVal s -> Name -> VTy s -> EVal s -> M s (Val s)
+evalPiTel :: EVal s -> Name s -> VTy s -> EVal s -> M s (Val s)
 evalPiTel k x a0 b = force a0 >>= \case
   VTNil -> b VTnil >>= k
   VTCons _ a as -> pure
-    let x' = x ++ "1"
-        x'' = x ++ "2"
+    let (x',x'') = splitName x
     in VPi x' Implicit a \ ~x1 -> do
       ~x1v <- as x1
       evalPiTel pure x'' x1v \ ~x2 -> b (VTcons x1 x2)
   a -> pure $ VPiTel x a b
 
-evalLamTel :: EVal s -> Name -> VTy s -> EVal s -> M s (Val s)
+evalLamTel :: EVal s -> Name s -> VTy s -> EVal s -> M s (Val s)
 evalLamTel k x a0 t = force a0 >>= \case
   VTNil -> t VTnil >>= k
   VTCons _ a as -> pure
-    let x' = x ++ "1"
-        x'' = x ++ "2"
+    let (x',x'') = splitName x
     in VLam x' Implicit a \ ~x1 -> do
       ~x1v <- as x1
       evalLamTel pure x'' x1v \ ~x2 -> t (VTcons x1 x2)
@@ -124,7 +122,7 @@ forceSp sp =
     VNe _ sp' -> pure sp'
     _ -> panic
 
-eval :: Vals s -> Tm (Meta s) -> M s (Val s)
+eval :: Vals s -> Tm s (Meta s) -> M s (Val s)
 eval vs = go where
   go = \case
     Var x        -> pure $ evalVar x vs
@@ -160,7 +158,7 @@ eval vs = go where
 
   goBind t x = eval (VDef vs x) t
 
-uneval :: Lvl -> Val s -> M s (Tm (Meta s))
+uneval :: Lvl -> Val s -> M s (Tm s (Meta s))
 uneval d = go where
   go v = force v >>= \case
     VNe h sp0 ->
@@ -187,7 +185,7 @@ uneval d = go where
 
   goBind t = t (VVar d) >>= uneval (d + 1)
 
-nf :: Vals s -> Tm (Meta s) -> M s (Tm (Meta s))
+nf :: Vals s -> Tm s (Meta s) -> M s (Tm s (Meta s))
 nf vs t = do
   v <- eval vs t
   uneval 0 v

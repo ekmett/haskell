@@ -1,3 +1,4 @@
+{-# Language RankNTypes #-}
 -- |
 -- Copyright :  (c) Edward Kmett 2020, András Kovács 2020
 -- License   :  BSD-2-Clause OR Apache-2.0
@@ -12,12 +13,11 @@ import Ergo.Names
 import Text.Megaparsec (SourcePos)
 
 data Term
-  = Var !Name
-  | Lam !Name !(Maybe Term) !Icit !Term
+  = Var !SourceName
+  | Lam !SourceName !(Maybe Term) !Icit !Term
   | App !Icit !Term !Term
-  | Pi  !Name !Icit !Term !Term
-  | Let !Name !Term !Term !Term
+  | Pi  !SourceName !Icit !Term !Term
+  | Let !SourceName !Term !Term !Term
   | U
   | Hole
   | Loc !SourcePos !Term
-  deriving (Eq,Show)

@@ -1,4 +1,7 @@
 {-# Language ImportQualifiedPost #-}
+{-# Language LambdaCase #-}
+{-# Language ViewPatterns #-}
+{-# Language ScopedTypeVariables #-}
 
 -- |
 -- Copyright :  (c) Edward Kmett 2020, András Kovács 2020
@@ -9,79 +12,96 @@
 
 module Ergo.Elaborate.Check where
 
-import Data.HashSet qualified as HS
+import Control.Monad (unless)
+import Control.Lens hiding (Context)
+import Ergo.Elaborate.Error
+import Ergo.Elaborate.Evaluation
+import Ergo.Elaborate.Monad
+import Ergo.Elaborate.Term
 import Ergo.Elaborate.Value
+import Ergo.Elaborate.Unification
+import Ergo.Icit
+import Ergo.Names
+import Ergo.Source.Term qualified as Raw
 
-data Occurs s
-  = Rigid          -- ^ At least one occurrence is not in the spine of any meta.
-  | Flex (Metas s) -- ^ All occurrences are inside spines of metas. We store the set of such metas.
-  | None           -- ^ The variable does not occur.
-  deriving Eq
+-- | Define a new variable.
+define :: Name s -> VTy s -> Val s -> Context s -> Context s
+define x a t (Context vs tys ns no d) =
+  Context (VDef vs t) (TySnoc tys Def a) (x:ns) (NOSource:no) (d + 1)
 
-instance Semigroup (Occurs s) where
-  Flex ms <> Flex ms' = Flex (ms <> ms')
-  Rigid   <> _        = Rigid
-  _       <> Rigid    = Rigid
-  None    <> r        = r
-  l       <> None     = l
+-- | Insert fresh implicit applications.
+insert' :: Context s -> M s (TM s, VTy s) -> M s (TM s, VTy s)
+insert' cxt act = do
+  (t0, va0) <- act
+  let go t va = force va >>= \case
+        VPi _ Implicit a b -> do
+          m <- freshMeta cxt a
+          mv <- eval (cxt^.vals) m
+          mv' <- b mv
+          go (App Implicit t m) mv'
+        va' -> pure (t, va')
+  go t0 va0
 
-instance Monoid (Occurs s) where
-  mempty = None
+-- | Insert fresh implicit applications to a term which is not
+--   an implicit lambda (i.e. neutral).
+insert :: Context s -> M s (TM s, VTy s) -> M s (TM s, VTy s)
+insert cxt act = act >>= \case
+  (t@(Lam _ Implicit _ _), va) -> pure (t, va)
+  (t                     , va) -> insert' cxt (pure (t, va))
 
-occurrence :: Metas s -> Occurs s
-occurrence ms
-  | HS.null ms = Rigid
-  | otherwise = Flex ms
-
-
-{-
-
-infer :: Context s -> Raw.Term -> M s (Tm (Meta RealWorld), VTy s)
+infer :: forall s. Context s -> Raw.Term -> M s (TM s, VTy s)
 infer cxt = \case
+  Raw.Loc p t -> addSourcePos p (infer cxt t)
+
   Raw.U -> pure (U, VU)
 
   Raw.Var x -> do
-    let go :: [Name] -> [NameOrigin] -> Types -> Int -> ST s (Tm s, VTy s)
-        go (y:xs) (NOSource:os) (TSnoc _ a) i | x == y || ('*':x) == y = pure (Var i,a)
-        go (_:xs) (_:os) (TSnoc as _) i = go xs os as (i + 1)
-        go [] [] TNil _ = report (cxt^.names) (NameNotInScope x)
+    let go :: [Name s] -> [NameOrigin] -> Types s -> Int -> M s (TM s, VTy s)
+        go (y:_) (NOSource:_) (TySnoc _ _ a) i | SourceName x 0 == y = pure (Var i,a)
+        go (_:xs) (_:os) (TySnoc as _ _) i = go xs os as (i + 1)
+        go [] [] TyNil _ = report (cxt^.names) $ NameNotInScope (SourceName x 0)
         go _ _ _ _ = panic
     go (cxt^.names) (cxt^.nameOrigin) (cxt^.types) 0
 
   Raw.Pi x i a b -> do
-    a <- check cxt a VU
-    eval (cxt^.vals) a
-    b <- check (bind x NOSource va cxt) b VU
-    pure (Pi x i a b, VU)
+    a' <- check cxt a VU
+    va <- eval (cxt^.vals) a'
+    b' <- check (bind (sourceName x) NOSource va cxt) b VU
+    pure (Pi (sourceName x) i a' b', VU)
 
-  Raw.App i t u -> do
+  Raw.App i t0 u -> do
     (t, va) <- case i of 
-      Explicit -> insert' cxt $ infer cxt t
-      _ -> infer cxt t
+      Explicit -> insert' cxt $ infer cxt t0
+      _        -> infer cxt t0
     force va >>= \case
-      VPi x i' a b -> do
+      VPi _ i' a b -> do
         unless (i == i') $
-          err (cxt^.names) $ IcitMismatch i i'
-        u <- check cxt u a
-        pure (App t u i, b (eval (cxt^.vals) u))
-      VNe (HMeta m) sp -> do
-        a <- eval (cxt^.vals) <$> freshMeta cxt VU
-        cod  <- freshMeta (bind "x" NOInserted a cxt) VU
-        let b ~x = eval (VDef (cxt^.vals) x) cod
-        unifyWhile cxt (VNe (HMeta m) sp) (VPi "x" i a b)
+          report (cxt^.names) $ IcitMismatch i i'
         u' <- check cxt u a
-        ty <- b (eval (cxt^.vals) u')
-        pure (App t u' i, ty)
-      _ -> err (cxt^.names) $ ExpectedFunction (quote (cxt^.len) va)
+        o <- eval (cxt^.vals) u' >>= b
+        pure (App i t u', o)
+      VNe (HMeta m) sp -> do
+        (m',a0) <- freshMeta' cxt VU 
+        a <- eval (cxt^.vals) a0
+        let x = metaName m'
+        c <- freshMeta (bind x NOInserted a cxt) VU
+        let b x' = eval (VDef (cxt^.vals) x') c
+        unifyWhile cxt (VNe (HMeta m) sp) (VPi x i a b)
+        u' <- check cxt u a
+        ty <- eval (cxt^.vals) u' >>= b
+        pure (App i t u', ty)
+      _ -> do
+        r <- unsafeInterleaveM (uneval (cxt^.len) va)
+        report (cxt^.names) $ ExpectedFunction r
 
-  Raw.Lam x ann i t -> do
+  Raw.Lam (sourceName -> x) ann i t -> do
     a <- case ann of
-      Just ann -> check cxt ann VU
-      Nothing  -> freshMeta cxt VU
+      Just ann' -> check cxt ann' VU
+      Nothing   -> freshMeta cxt VU
     va <- eval (cxt^.vals) a
     let cxt' = bind x NOSource va cxt
-    (t, liftVal cxt -> b) <- insert cxt' $ infer cxt' t
-    pure (Lam x i a t, VPi x i va b)
+    (t', liftVal cxt -> b) <- insert cxt' $ infer cxt' t
+    pure (Lam x i a t', VPi x i va b)
 
   Raw.Hole -> do
     a <- freshMeta cxt VU
@@ -89,12 +109,64 @@ infer cxt = \case
     t <- freshMeta cxt va
     pure (t, va)
 
-  Raw.Let x a t u -> do
-    a <- check cxt a VU
-    ~va <- eval (cxt^.vals) a
-    t <- check cxt t va
-    ~vt <- eval (cxt^.vals) t
-    (u, b) <- infer (define x va vt cxt) u
-    pure (Let x a t u, b)
+  Raw.Let (sourceName -> x) a0 t0 u -> do
+    a <- check cxt a0 VU
+    va <- eval (cxt^.vals) a
+    t <- check cxt t0 va
+    vt <- eval (cxt^.vals) t
+    (u', b) <- infer (define x va vt cxt) u
+    pure (Let x a t u', b)
 
--}
+metaName :: Meta s -> Name s
+metaName (MetaRef u _) = MetaName u 0
+
+check :: Context s -> Raw.Term -> VTy s -> M s (TM s)
+check cxt topT ~topA0 = force topA0 >>= \ ftopA -> case (topT, ftopA) of
+  (Raw.Loc p t, a) -> addSourcePos p (check cxt t a)
+
+  (Raw.Lam (sourceName -> x) ann0 i t0, VPi _ i' a b) | i == i' -> do
+    ann' <- case ann0 of
+      Just ann1 -> do
+        ann <- check cxt ann1 VU
+        ann' <- unsafeInterleaveM $ eval (cxt^.vals) ann
+        unifyWhile cxt ann' a
+        pure ann
+      Nothing -> uneval (cxt^.len) a
+    t <- do
+      ty <- b (VVar (cxt^.len))
+      check (bind x NOSource a cxt) t0 ty
+    pure $ Lam x i ann' t
+
+  (t0, VPi x Implicit a b) -> do
+    ty <- b (VVar (cxt^.len))
+    t <- check (bind x NOInserted a cxt) t0 ty
+    a' <- uneval (cxt^.len) a
+    pure $ Lam x Implicit a' t
+
+  -- inserting a new curried function lambda
+  (t0, VNe (HMeta _) _) -> do
+    -- x <- ("Γ"++) . show <$> readMeta nextMId
+    (m,d) <- freshMeta' cxt VTel
+    let x = metaName m
+    vdom <- unsafeInterleaveM $ eval (cxt^.vals) d
+    let cxt' = bind x NOInserted (VRec vdom) cxt
+    (t, liftVal cxt -> a) <- insert cxt' $ infer cxt' t0
+    newConstancy cxt vdom a
+    unifyWhile cxt topA0 (VPiTel x vdom a)
+    pure $ LamTel x d t
+
+  (Raw.Let (sourceName -> x) a0 t0 u0, topA) -> do
+    a <- check cxt a0 VU
+    va <- unsafeInterleaveM (eval (cxt^.vals) a)
+    t <- check cxt t0 va
+    vt <- unsafeInterleaveM (eval (cxt^.vals) t)
+    u <- check (define x va vt cxt) u0 topA
+    pure $ Let x a t u
+
+  (Raw.Hole, topA) -> freshMeta cxt topA
+
+  (t0, topA) -> do
+    (t, va) <- insert cxt $ infer cxt t0
+    unifyWhile cxt va topA
+    pure t
+

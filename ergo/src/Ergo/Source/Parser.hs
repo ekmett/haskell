@@ -16,6 +16,7 @@ import Control.Monad (guard)
 import Data.Char
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
+import Data.String 
 import Data.Void (Void)
 import Ergo.Icit
 import Ergo.Names
@@ -25,6 +26,11 @@ import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 
+underscore :: SourceName
+underscore = fromString "_"
+{-# NOINLINE underscore #-}
+
+-- TODO: carry a small interning table to get better sharing on ShortText names?
 type Parser = Parsec Void String
 
 loc :: Parser Term -> Parser Term
@@ -49,8 +55,9 @@ braces p = char '{' *> p <* char '}'
 arr :: Parser String
 arr = symbol "→" <|> symbol "->"
 
-bind :: Parser Name
-bind = ident <|> symbol "_"
+bind :: Parser SourceName
+bind = ident 
+   <|> underscore <$ symbol "_"
 
 colon, dot, lambda :: Parser String
 colon = op ":"
@@ -61,10 +68,10 @@ lambda = pure <$> char 'λ'
 isKeyword :: String -> Bool
 isKeyword x = x `elem` ["let","in","λ","U"]
 
-ident :: Parser Name
+ident :: Parser SourceName
 ident = try do
   x <- takeWhile1P Nothing isAlphaNum <* whitespace
-  x <$ guard (not (isKeyword x))
+  fromString x <$ guard (not (isKeyword x))
 
 kw :: String -> Parser String
 kw s = try do
@@ -93,7 +100,7 @@ spine = foldl' (\t (i, u) -> App i t u) <$> atom <*> many arg
 
 lam :: Parser Term
 lam = go <$ lambda <*> some binder <* dot <*> term where
-  binder :: Parser (Name, Maybe Term, Icit)
+  binder :: Parser (SourceName, Maybe Term, Icit)
   binder = ((,Nothing,Explicit) <$> bind)
     <|> parens ((,,Explicit) <$> bind <*> optional (colon *> term))
     <|> braces ((,,Implicit) <$> bind <*> optional (colon *> term))
@@ -106,7 +113,7 @@ let_ = go <$ symbol "let" <*> ident <*> optional (colon *> term)
 
 pi :: Parser Term
 pi = go <$> try (some binder) <* arr <*> term
- <|> Pi "_" Explicit <$> spine <* arr <*> term where
+ <|> Pi underscore Explicit <$> spine <* arr <*> term where
   go dom cod = foldr (\(xs, a, i) t -> foldr (\x -> Pi x i a) t xs) cod dom
   binder = braces ((,,Implicit) <$> some bind <*> ((colon *> term) <|> pure Hole))
        <|> parens ((,,Explicit) <$> some bind <* colon <*> term)

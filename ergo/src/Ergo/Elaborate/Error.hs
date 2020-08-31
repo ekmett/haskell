@@ -1,8 +1,11 @@
 {-# Language BlockArguments #-}
 {-# Language ImportQualifiedPost #-}
+{-# Language ExistentialQuantification #-}
+{-# Language LambdaCase #-}
+{-# Language DeriveAnyClass #-}
 
 -- |
--- Copyright :  (c) Edward Kmett 2020, András Kovács 2020
+-- Copyright :  (c) Edward Kmett and András Kovács 2020
 -- License   :  BSD-2-Clause OR Apache-2.0
 -- Maintainer:  Edward Kmett <ekmett@gmail.com>
 -- Stability :  experimental
@@ -10,54 +13,70 @@
 
 module Ergo.Elaborate.Error where
 
---import Text.Megaparsec (SourcePos)
--- import Control.Monad.ST
--- import Control.Monad.ST.Unsafe
+import Control.Exception
+import Control.Monad.Catch as M
+import Ergo.Elaborate.Monad
+import Ergo.Elaborate.Term
+import Ergo.Elaborate.Value
+import Ergo.Icit
+import Ergo.Names
+import Text.Megaparsec (SourcePos)
 
--- type TM s = Tm (Meta s)
-
-{-
-data SpineError 
-  = SpineNonVar 
+data SpineError
+  = SpineNonVar
   | SpineProjection
   | NonLinearSpine Lvl
+  deriving (Show, Exception)
 
 data StrengtheningError
   = ScopeError Lvl
   | OccursCheck
+  deriving (Show, Exception)
 
-data UnifyError a
-  = UnifyError [Name] (Tm a) (Tm a)
-  | SpineError [Name] (Tm a) (Tm a) SpineError
-  | StrengtheningError [Name] (Tm a) (Tm a) StrengtheningError
-  deriving (Functor, Foldable, Traversable)
+data UnifyError
+  = forall s. UnifyError [Name s] (TM s) (TM s)
+  | forall s. SpineError [Name s] (TM s) (TM s) SpineError
+  | forall s. StrengtheningError [Name s] (TM s) (TM s) StrengtheningError
+  deriving Exception
+
+instance Show UnifyError where
+  show _ = "UnifyError..."
+
+-- type TM s = Tm (Meta s)
 
 data ElabError
   = IcitMismatch Icit Icit
-  | ∀s. ExpectedFunction (TM s)
-  | NameNotInScope Name
-  | ∀s. UnifyErrorWhile (TM s) (TM s) (UnifyError (Meta s))
+  | forall s. ExpectedFunction (TM s)
+  | forall s. NameNotInScope (Name s)
+  | forall s. UnifyErrorWhile (TM s) (TM s) UnifyError
   deriving (Exception)
 
-data Err = Err [Name] ElabError (Maybe SourcePos)
+instance Show ElabError where
+  show _ = "ElabError..."
+
+data Err = forall s. Err [Name s] ElabError (Maybe SourcePos)
+
+instance Exception Err where
+  -- displayException (Err ns e p) = prettyErr ns e
 
 instance Show Err where
+  show _ = "Err..."
+
+  {- 
   showsPrec d (Err ns ee p) = showParen (d > 10) $
     showString "Err " . showsPrec 11 ns . showChar ' ' 
                       . showsPrec 11 ee . showChar ' '
                       . showsPrec 11 p
+-}
 
-addSourcePos :: forall s. SourcePos -> IO a -> IO a
-addSourcePos p act = act `catch` \case
-  Err ns e Nothing -> throwIO $ Err ns e (Just p)
-  e -> throwIO e
+addSourcePos :: SourcePos -> M s a -> M s a
+addSourcePos p act = act `M.catch` \case
+  Err ns e Nothing -> throwM $ Err ns e (Just p)
+  e -> throwM e
 
-reportST :: [Name] -> ElabError -> ST s a
-reportST ns e = unsafeIOtoSt throwIO $ Err ns e Nothing
+reportM :: [Name s] -> ElabError -> M s a
+reportM ns e = throwM $ Err ns e Nothing
 
-report :: [Name] -> ElabError -> a
+report :: [Name s] -> ElabError -> a
 report ns e = throw $ Err ns e Nothing
 
-instance Exception Err where
-  displayException (Err ns e p) = prettyErr ns e
--}

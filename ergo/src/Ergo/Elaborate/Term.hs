@@ -7,31 +7,36 @@
 
 module Ergo.Elaborate.Term where
 
+import Ergo.Elaborate.Value
 import Ergo.Names
 import Ergo.Icit
 
 type Ty = Tm
 type Ix = Int
 
-data Tm a
+data Tm s a
   = Var !Ix                            -- ^ x
-  | Let !Name !(Ty a) !(Tm a) !(Tm a)  -- ^ let x : A = t in u
-  | Pi !Name !Icit !(Ty a) !(Ty a)     -- ^ (x : A) → B)  or  {x : A} → B
-  | Lam !Name !Icit !(Ty a) !(Tm a)    -- ^ λ(x : A).t  or  λ{x : A}.t
-  | App !Icit (Tm a) !(Tm a)           -- ^ t u  or  t {u}
+  | Let !(Name s) !(Ty s a) !(Tm s a) !(Tm s a)  -- ^ let x : A = t in u
+  | Pi !(Name s) !Icit !(Ty s a) !(Ty s a)     -- ^ (x : A) → B)  or  {x : A} → B
+  | Lam !(Name s) !Icit !(Ty s a) !(Tm s a)    -- ^ λ(x : A).t  or  λ{x : A}.t
+  | App !Icit (Tm s a) !(Tm s a)           -- ^ t u  or  t {u}
 
   | Tel                                -- ^ Tel
   | TNil                               -- ^ ε
-  | TCons !Name !(Ty a) !(Ty a)        -- ^ (x : A) ▷ B
-  | Rec !(Tm a)                        -- ^ Rec A
+  | TCons !(Name s) !(Ty s a) !(Ty s a)        -- ^ (x : A) ▷ B
+  | Rec !(Tm s a)                        -- ^ Rec A
   | Tnil                               -- ^ []
-  | Tcons !(Tm a) !(Tm a)              -- ^ t :: u
-  | Proj1 !(Tm a)                      -- ^ π₁ t
-  | Proj2 !(Tm a)                      -- ^ π₂ t
-  | PiTel !Name !(Ty a) !(Ty a)        -- ^ {x : A⃗} → B
-  | AppTel !(Ty a) !(Tm a) !(Tm a)     -- ^ t {u : A⃗}
-  | LamTel !Name !(Ty a) !(Tm a)       -- ^ λ{x : A⃗}.t
+  | Tcons !(Tm s a) !(Tm s a)              -- ^ t :: u
+  | Proj1 !(Tm s a)                      -- ^ π₁ t
+  | Proj2 !(Tm s a)                      -- ^ π₂ t
+  | PiTel !(Name s) !(Ty s a) !(Ty s a)        -- ^ {x : A⃗} → B
+  | AppTel !(Ty s a) !(Tm s a) !(Tm s a)     -- ^ t {u : A⃗}
+  | LamTel !(Name s) !(Ty s a) !(Tm s a)       -- ^ λ{x : A⃗}.t
 
   | U                                  -- ^ U
   | Meta a                             -- ^ α
-  | Skip !(Tm a)                       -- ^ explicit weakening for closing types
+  | Skip !(Tm s a)                       -- ^ explicit weakening for closing types
+
+type TM s = Tm s (Meta s)
+type TY s = Ty s (Meta s)
+

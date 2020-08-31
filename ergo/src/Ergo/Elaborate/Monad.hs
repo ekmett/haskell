@@ -12,6 +12,10 @@
 -- Maintainer:  Edward Kmett <ekmett@gmail.com>
 -- Stability :  experimental
 -- Portability: non-portable
+--
+-- Using 'M' as a newtype over 'ST' to explicitly track the fact
+-- that we're willing and able to interleave computations lazily
+-- as well as willing to throw, catch and mask exceptions in 'M'.
 
 module Ergo.Elaborate.Monad where
 
@@ -64,9 +68,11 @@ instance MonadMask (M s) where
 
 instance Semigroup a => Semigroup (M s a) where
   (<>) = liftA2 (<>)
+  {-# inline (<>) #-}
 
 instance Monoid a => Monoid (M s a) where
   mempty = pure mempty
+  {-# inline mempty #-}
 
 runM :: (forall s. M s a) -> a
 runM m = runST (unM m)
