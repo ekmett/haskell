@@ -18,11 +18,8 @@ module Elaborate.Occurrence
 
 
 import Control.Applicative (liftA2)
---import Control.Monad.Primitive
---import Control.Monad.ST
 import Data.HashSet qualified as HS
 import Elaborate.Evaluation
-import Elaborate.Monad
 import Elaborate.Value
 
 data Occurs

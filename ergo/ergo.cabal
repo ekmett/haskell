@@ -52,7 +52,6 @@ library
     Elaborate.Check
     Elaborate.Error
     Elaborate.Evaluation
-    Elaborate.Monad
     Elaborate.Occurrence
     Elaborate.Term
     Elaborate.Unification

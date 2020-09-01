@@ -14,7 +14,6 @@
 module Elaborate.Evaluation where
 
 import Data.Functor ((<&>))
-import Elaborate.Monad
 import Elaborate.Term
 import Elaborate.Value
 import GHC.IO.Unsafe
