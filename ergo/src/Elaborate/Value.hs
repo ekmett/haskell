@@ -13,11 +13,9 @@
 module Elaborate.Value where
 
 import Control.Lens hiding (Context)
-import Control.Monad.Primitive
 import Data.Hashable
 import Data.HashSet
-import Data.Primitive.MutVar
-import Elaborate.Monad
+import Data.IORef
 import Icit
 import Names
 import Unique
@@ -27,58 +25,58 @@ import GHC.Stack.Types
 panic :: HasCallStack => a
 panic = throw (errorCallWithCallStackException "impossible" ?callStack)
 
-data Meta s = MetaRef {-# unpack #-} !(Unique s) {-# unpack #-} !(MutVar s (MetaEntry s))
+data Meta = MetaRef {-# unpack #-} !Unique {-# unpack #-} !(IORef MetaEntry)
 
-instance Eq (Meta s) where
+instance Eq Meta where
   MetaRef _ m == MetaRef _ n = m == n
 
-instance Hashable (Meta s) where
+instance Hashable Meta where
   hash (MetaRef h _) = hash h
   hashWithSalt d (MetaRef h _) = hashWithSalt d h
 
-newMeta :: MonadPrim s m => MetaEntry s -> m (Meta s)
-newMeta m = MetaRef <$> newUnique <*> newMutVar m
+newMeta :: MetaEntry -> IO Meta
+newMeta m = MetaRef <$> newUnique <*> newIORef m
 {-# inline newMeta #-}
 
-writeMeta :: MonadPrim s m => Meta s -> MetaEntry s -> m ()
-writeMeta (MetaRef _ r) s = writeMutVar r s
+writeMeta :: Meta -> MetaEntry -> IO ()
+writeMeta (MetaRef _ r) s = writeIORef r s
 {-# inline writeMeta #-}
 
-readMeta :: MonadPrim s m => Meta s -> m (MetaEntry s)
-readMeta (MetaRef _ r) = readMutVar r
+readMeta :: Meta -> IO MetaEntry
+readMeta (MetaRef _ r) = readIORef r
 {-# inline readMeta #-}
 
-modifyMeta :: MonadPrim s m => Meta s -> (MetaEntry s -> MetaEntry s) -> m ()
-modifyMeta (MetaRef _ r) f = modifyMutVar' r f
+modifyMeta :: Meta -> (MetaEntry -> MetaEntry) -> IO ()
+modifyMeta (MetaRef _ r) f = modifyIORef' r f
 {-# inline modifyMeta #-}
 
-type Metas s = HashSet (Meta s)
-type Blocking s = Metas s
-type BlockedBy s = Metas s
+type Metas = HashSet Meta
+type Blocking = Metas
+type BlockedBy = Metas
 
-data MetaEntry s
-  = Unsolved !(Metas s) (VTy s)
-  | Solved !(Val s)
-  | Constancy !(Context s) !(VTy s) !(VTy s) !(BlockedBy s)
+data MetaEntry
+  = Unsolved !Metas VTy
+  | Solved !Val
+  | Constancy !Context !VTy !VTy !BlockedBy
   | Dropped
 
 data SlotType = Def | Bound
   deriving (Eq,Ord,Show,Read,Bounded,Enum)
 
-data Vals s
+data Vals
   = VNil
-  | VSkip !(Vals s)
-  | VDef !(Vals s) (Val s)
+  | VSkip !Vals
+  | VDef !Vals Val
 
-data Types s
+data Types
   = TyNil
-  | TySnoc !(Types s) !SlotType (VTy s)
+  | TySnoc !Types !SlotType VTy
 
-data Context s 
+data Context
   = Context
-   { _vals :: Vals s
-   , _types :: Types s
-   , _names :: [Name s]
+   { _vals :: Vals
+   , _types :: Types
+   , _names :: [Name]
    , _nameOrigin :: [NameOrigin]
    , _len :: Int
    }
@@ -88,41 +86,41 @@ data NameOrigin = NOSource | NOInserted
 
 type Lvl = Int
 
-data Head s
+data Head
   = HVar {-# unpack #-} !Lvl
-  | HMeta {-# unpack #-} !(Meta s)
+  | HMeta {-# unpack #-} !Meta
   deriving Eq
 
-data Spine s
+data Spine
   = SNil
-  | SApp !Icit !(Spine s) (Val s)
-  | SAppTel (Val s) !(Spine s) (Val s)
-  | SProj1 !(Spine s)
-  | SProj2 !(Spine s)
+  | SApp !Icit !Spine Val
+  | SAppTel Val !Spine Val
+  | SProj1 !Spine
+  | SProj2 !Spine
 
 type VTy = Val
 
-data Val s
-  = VNe !(Head s) !(Spine s)
-  | VPi !(Name s) !Icit (VTy s) (EVTy s)
-  | VLam !(Name s) !Icit (VTy s) (EVal s)
+data Val
+  = VNe !Head !Spine
+  | VPi !Name !Icit VTy EVTy
+  | VLam !Name !Icit VTy EVal
   | VU
   | VTel
-  | VRec (Val s)
+  | VRec Val
   | VTNil
-  | VTCons !(Name s) (Val s) (EVal s)
+  | VTCons !Name Val EVal
   | VTnil
-  | VTcons (Val s) (Val s)
-  | VPiTel !(Name s) (Val s) (EVal s)
-  | VLamTel !(Name s) (Val s) (EVal s)
+  | VTcons Val Val
+  | VPiTel !Name Val EVal
+  | VLamTel !Name Val EVal
 
-type EVal s = Val s -> M s (Val s)
-type EVTy s = VTy s -> M s (VTy s)
+type EVal = Val -> IO Val
+type EVTy = VTy -> IO VTy
 
-pattern VVar :: Lvl -> Val s
+pattern VVar :: Lvl -> Val
 pattern VVar x = VNe (HVar x) SNil
 
-pattern VMeta :: Meta s -> Val s
+pattern VMeta :: Meta -> Val
 pattern VMeta m = VNe (HMeta m) SNil
 
 makeLenses ''Context

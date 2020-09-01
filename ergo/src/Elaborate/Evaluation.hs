@@ -17,10 +17,11 @@ import Data.Functor ((<&>))
 import Elaborate.Monad
 import Elaborate.Term
 import Elaborate.Value
+import GHC.IO.Unsafe
 import Icit
 import Names
 
-valsLen :: Vals s -> Int
+valsLen :: Vals -> Int
 valsLen = go 0 where
   go acc VNil        = acc
   go acc (VDef vs _) = go (acc + 1) vs
@@ -28,32 +29,32 @@ valsLen = go 0 where
 
 -- eval
 
-evalProj1 :: Val s -> M s (Val s)
+evalProj1 :: Val -> IO Val
 evalProj1 (VTcons t _) = pure t
 evalProj1 (VNe h sp) = pure $ VNe h (SProj1 sp)
 evalProj1 (VLamTel x a t) = evalLamTel pure x a t >>= evalProj1
 evalProj1 _ = panic
 
-evalProj2 :: Val s -> M s (Val s)
+evalProj2 :: Val -> IO Val
 evalProj2 (VTcons _ u) = pure u
 evalProj2 (VNe h sp) = pure $ VNe h (SProj2 sp)
 evalProj2 (VLamTel x a t) = evalLamTel pure x a t >>= evalProj2
 evalProj2 _ = panic
 
-evalVar :: Ix -> Vals s -> Val s
+evalVar :: Ix -> Vals -> Val
 evalVar 0 (VDef _ v) = v
 evalVar 0 (VSkip vs) = VVar (valsLen vs)
 evalVar x (VDef vs _) = evalVar (x - 1) vs
 evalVar x (VSkip vs) = evalVar (x - 1) vs
 evalVar _ _ = panic
 
-evalMeta :: Meta s -> M s (Val s)
+evalMeta :: Meta -> IO Val
 evalMeta m = readMeta m <&> \case
   Unsolved{} -> VMeta m
   Solved v -> v
   _ -> panic
 
-evalPiTel :: EVal s -> Name s -> VTy s -> EVal s -> M s (Val s)
+evalPiTel :: EVal -> Name -> VTy -> EVal -> IO Val
 evalPiTel k x a0 b = force a0 >>= \case
   VTNil -> b VTnil >>= k
   VTCons _ a as -> pure
@@ -63,7 +64,7 @@ evalPiTel k x a0 b = force a0 >>= \case
       evalPiTel pure x'' x1v \ ~x2 -> b (VTcons x1 x2)
   a -> pure $ VPiTel x a b
 
-evalLamTel :: EVal s -> Name s -> VTy s -> EVal s -> M s (Val s)
+evalLamTel :: EVal -> Name -> VTy -> EVal -> IO Val
 evalLamTel k x a0 t = force a0 >>= \case
   VTNil -> t VTnil >>= k
   VTCons _ a as -> pure
@@ -73,7 +74,7 @@ evalLamTel k x a0 t = force a0 >>= \case
       evalLamTel pure x'' x1v \ ~x2 -> t (VTcons x1 x2)
   a -> pure $ VLamTel x a t
 
-evalAppTel ::  VTy s -> Val s -> Val s -> M s (Val s)
+evalAppTel ::  VTy -> Val -> Val -> IO Val
 evalAppTel a0 t u = force a0 >>= \case
   VTNil -> pure t
   VTCons _ _ as -> do
@@ -87,7 +88,7 @@ evalAppTel a0 t u = force a0 >>= \case
     VLamTel _ _ t' -> t' u
     _ -> panic
 
-evalApp :: Icit -> Val s -> Val s -> M s (Val s)
+evalApp :: Icit -> Val -> Val -> IO Val
 evalApp _ (VLam _ _ _ t)  u = t u
 evalApp i (VNe h sp)      u = pure $ VNe h (SApp i sp u)
 evalApp i (VLamTel x a t) u = do
@@ -95,7 +96,7 @@ evalApp i (VLamTel x a t) u = do
   evalApp i y u
 evalApp _                _ _ = panic
 
-evalAppSp :: forall s. Val s -> Spine s -> M s (Val s)
+evalAppSp :: Val -> Spine -> IO Val
 evalAppSp h = go where
   go SNil             = pure h
   go (SApp i sp u)    = do sp' <- go sp; evalApp i sp' u
@@ -103,7 +104,7 @@ evalAppSp h = go where
   go (SProj1 sp)      = go sp >>= evalProj1
   go (SProj2 sp)      = go sp >>= evalProj2
 
-force :: Val s -> M s (Val s)
+force :: Val -> IO Val
 force = \case
   v0@(VNe (HMeta m) sp) -> readMeta m >>= \case
     Unsolved{} -> pure v0
@@ -113,7 +114,7 @@ force = \case
   VLamTel x a t -> evalLamTel force x a t
   v -> pure v
 
-forceSp :: Spine s -> M s (Spine s)
+forceSp :: Spine -> IO Spine
 forceSp sp =
   -- This is a cheeky hack, the point is that (VVar (-1)) blocks computation, and
   -- we get back the new spine.  We use (-1) in order to make the hack clear in
@@ -122,43 +123,43 @@ forceSp sp =
     VNe _ sp' -> pure sp'
     _ -> panic
 
-eval :: Vals s -> Tm s (Meta s) -> M s (Val s)
+eval :: Vals -> TM -> IO Val
 eval vs = go where
   go = \case
     Var x        -> pure $ evalVar x vs
     Let _ _ t u  -> go t >>= goBind u
     U            -> pure VU
     Meta m       -> evalMeta m
-    Pi x i a b   -> unsafeInterleaveM (go a) <&> \a' -> VPi x i a' (goBind b)
-    Lam x i a t  -> unsafeInterleaveM (go a) <&> \a' -> VLam x i a' (goBind t)
+    Pi x i a b   -> unsafeInterleaveIO (go a) <&> \a' -> VPi x i a' (goBind b)
+    Lam x i a t  -> unsafeInterleaveIO (go a) <&> \a' -> VLam x i a' (goBind t)
     App i t u    -> do
-      t' <- unsafeInterleaveM (go t)
-      u' <- unsafeInterleaveM (go u)
+      t' <- unsafeInterleaveIO (go t)
+      u' <- unsafeInterleaveIO (go u)
       evalApp i t' u'
     Tel          -> pure VTel
     TNil         -> pure VTNil
-    TCons x a b  -> unsafeInterleaveM (go a) <&> \a' -> VTCons x a' (goBind b)
+    TCons x a b  -> unsafeInterleaveIO (go a) <&> \a' -> VTCons x a' (goBind b)
     Rec a        -> VRec <$> go a
     Tnil         -> pure VTnil
-    Tcons t u    -> VTcons <$> unsafeInterleaveM (go t) <*> unsafeInterleaveM (go u)
+    Tcons t u    -> VTcons <$> unsafeInterleaveIO (go t) <*> unsafeInterleaveIO (go u)
     Proj1 t      -> go t >>= evalProj1
     Proj2 t      -> go t >>= evalProj2
     PiTel x a b  -> do
-      a' <- unsafeInterleaveM (go a)
+      a' <- unsafeInterleaveIO (go a)
       evalPiTel pure x a' (goBind b)
     AppTel a t u -> do
-      a' <- unsafeInterleaveM (go a)
-      t' <- unsafeInterleaveM (go t)
-      u' <- unsafeInterleaveM (go u)
+      a' <- unsafeInterleaveIO (go a)
+      t' <- unsafeInterleaveIO (go t)
+      u' <- unsafeInterleaveIO (go u)
       evalAppTel a' t' u'
     LamTel x a t -> do
-      a' <- unsafeInterleaveM (go a)
+      a' <- unsafeInterleaveIO (go a)
       evalLamTel pure x a' (goBind t)
     Skip t -> eval (VSkip vs) t
 
   goBind t x = eval (VDef vs x) t
 
-uneval :: Lvl -> Val s -> M s (Tm s (Meta s))
+uneval :: Lvl -> Val -> IO TM
 uneval d = go where
   go v = force v >>= \case
     VNe h sp0 ->
@@ -185,9 +186,8 @@ uneval d = go where
 
   goBind t = t (VVar d) >>= uneval (d + 1)
 
-nf :: Vals s -> Tm s (Meta s) -> M s (Tm s (Meta s))
+nf :: Vals -> TM -> IO TM
 nf vs t = do
   v <- eval vs t
   uneval 0 v
 {-# inline nf #-}
-

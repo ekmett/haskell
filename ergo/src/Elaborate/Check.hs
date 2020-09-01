@@ -16,21 +16,21 @@ import Control.Monad (unless)
 import Control.Lens hiding (Context)
 import Elaborate.Error
 import Elaborate.Evaluation
-import Elaborate.Monad
 import Elaborate.Term
 import Elaborate.Value
 import Elaborate.Unification
 import Icit
 import Names
 import Source.Term qualified as Raw
+import System.IO.Unsafe (unsafeInterleaveIO)
 
 -- | Define a new variable.
-define :: Name s -> VTy s -> Val s -> Context s -> Context s
+define :: Name -> VTy -> Val -> Context -> Context
 define x a t (Context vs tys ns no d) =
   Context (VDef vs t) (TySnoc tys Def a) (x:ns) (NOSource:no) (d + 1)
 
 -- | Insert fresh implicit applications.
-insert' :: Context s -> M s (TM s, VTy s) -> M s (TM s, VTy s)
+insert' :: Context -> IO (TM, VTy) -> IO (TM, VTy)
 insert' cxt act = do
   (t0, va0) <- act
   let go t va = force va >>= \case
@@ -44,19 +44,19 @@ insert' cxt act = do
 
 -- | Insert fresh implicit applications to a term which is not
 --   an implicit lambda (i.e. neutral).
-insert :: Context s -> M s (TM s, VTy s) -> M s (TM s, VTy s)
+insert :: Context -> IO (TM, VTy) -> IO (TM, VTy)
 insert cxt act = act >>= \case
   (t@(Lam _ Implicit _ _), va) -> pure (t, va)
   (t                     , va) -> insert' cxt (pure (t, va))
 
-infer :: forall s. Context s -> Raw.Term -> M s (TM s, VTy s)
+infer :: Context -> Raw.Term -> IO (TM, VTy)
 infer cxt = \case
   Raw.Loc p t -> addSourcePos p (infer cxt t)
 
   Raw.U -> pure (U, VU)
 
   Raw.Var x -> do
-    let go :: [Name s] -> [NameOrigin] -> Types s -> Int -> M s (TM s, VTy s)
+    let go :: [Name] -> [NameOrigin] -> Types -> Int -> IO (TM, VTy)
         go (y:_) (NOSource:_) (TySnoc _ _ a) i | SourceName x 0 == y = pure (Var i,a)
         go (_:xs) (_:os) (TySnoc as _ _) i = go xs os as (i + 1)
         go [] [] TyNil _ = report (cxt^.names) $ NameNotInScope (SourceName x 0)
@@ -91,7 +91,7 @@ infer cxt = \case
         ty <- eval (cxt^.vals) u' >>= b
         pure (App i t u', ty)
       _ -> do
-        r <- unsafeInterleaveM (uneval (cxt^.len) va)
+        r <- unsafeInterleaveIO (uneval (cxt^.len) va)
         report (cxt^.names) $ ExpectedFunction r
 
   Raw.Lam (sourceName -> x) ann i t -> do
@@ -117,10 +117,10 @@ infer cxt = \case
     (u', b) <- infer (define x va vt cxt) u
     pure (Let x a t u', b)
 
-metaName :: Meta s -> Name s
+metaName :: Meta -> Name
 metaName (MetaRef u _) = MetaName u 0
 
-check :: Context s -> Raw.Term -> VTy s -> M s (TM s)
+check :: Context -> Raw.Term -> VTy -> IO TM
 check cxt topT ~topA0 = force topA0 >>= \ ftopA -> case (topT, ftopA) of
   (Raw.Loc p t, a) -> addSourcePos p (check cxt t a)
 
@@ -128,7 +128,7 @@ check cxt topT ~topA0 = force topA0 >>= \ ftopA -> case (topT, ftopA) of
     ann' <- case ann0 of
       Just ann1 -> do
         ann <- check cxt ann1 VU
-        ann' <- unsafeInterleaveM $ eval (cxt^.vals) ann
+        ann' <- unsafeInterleaveIO $ eval (cxt^.vals) ann
         unifyWhile cxt ann' a
         pure ann
       Nothing -> uneval (cxt^.len) a
@@ -148,7 +148,7 @@ check cxt topT ~topA0 = force topA0 >>= \ ftopA -> case (topT, ftopA) of
     -- x <- ("Γ"++) . show <$> readMeta nextMId
     (m,d) <- freshMeta' cxt VTel
     let x = metaName m
-    vdom <- unsafeInterleaveM $ eval (cxt^.vals) d
+    vdom <- unsafeInterleaveIO $ eval (cxt^.vals) d
     let cxt' = bind x NOInserted (VRec vdom) cxt
     (t, liftVal cxt -> a) <- insert cxt' $ infer cxt' t0
     newConstancy cxt vdom a
@@ -157,9 +157,9 @@ check cxt topT ~topA0 = force topA0 >>= \ ftopA -> case (topT, ftopA) of
 
   (Raw.Let (sourceName -> x) a0 t0 u0, topA) -> do
     a <- check cxt a0 VU
-    va <- unsafeInterleaveM (eval (cxt^.vals) a)
+    va <- unsafeInterleaveIO (eval (cxt^.vals) a)
     t <- check cxt t0 va
-    vt <- unsafeInterleaveM (eval (cxt^.vals) t)
+    vt <- unsafeInterleaveIO (eval (cxt^.vals) t)
     u <- check (define x va vt cxt) u0 topA
     pure $ Let x a t u
 

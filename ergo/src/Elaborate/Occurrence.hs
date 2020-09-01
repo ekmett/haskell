@@ -25,35 +25,35 @@ import Elaborate.Evaluation
 import Elaborate.Monad
 import Elaborate.Value
 
-data Occurs s
-  = Rigid          -- ^ At least one occurrence is not in the spine of any meta.
-  | Flex (Metas s) -- ^ All occurrences are inside spines of metas. We store the set of such metas.
-  | None           -- ^ The variable does not occur.
+data Occurs
+  = Rigid       -- ^ At least one occurrence is not in the spine of any meta.
+  | Flex !Metas -- ^ All occurrences are inside spines of metas. We store the set of such metas.
+  | None        -- ^ The variable does not occur.
   deriving Eq
 
-instance Semigroup (Occurs s) where
+instance Semigroup Occurs where
   Flex ms <> Flex ms' = Flex (ms <> ms')
   Rigid   <> _        = Rigid
   _       <> Rigid    = Rigid
   None    <> r        = r
   l       <> None     = l
 
-instance Monoid (Occurs s) where
+instance Monoid Occurs where
   mempty = None
 
-occurrence :: Metas s -> Occurs s
+occurrence :: Metas -> Occurs
 occurrence ms
   | HS.null ms = Rigid
   | otherwise = Flex ms
 
-(><) :: M s (Occurs s) -> M s (Occurs s) -> M s (Occurs s)
+(><) :: IO Occurs -> IO Occurs -> IO Occurs
 (><) = liftA2 (<>)
 
 -- | Occurs check for the purpose of constancy constraint solving.
-occurs :: Lvl -> Lvl -> Val s -> M s (Occurs s)
+occurs :: Lvl -> Lvl -> Val -> IO Occurs
 occurs d0 topX v0 = occurs' d0 mempty v0 where
 
-  occurs' :: Lvl -> Metas s -> Val s -> M s (Occurs s)
+  occurs' :: Lvl -> Metas -> Val -> IO Occurs
   occurs' d ms0 = go where
 
     goSp ms sp0 = forceSp sp0 >>= \case

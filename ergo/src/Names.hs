@@ -31,22 +31,22 @@ import Data.String
 import GHC.Generics
 import Numeric.Natural
 
-data Name s
+data Name
   = SourceName ShortText Natural
-  | MetaName (Unique s) Natural
+  | MetaName Unique Natural
   deriving (Eq,Generic,Hashable)
 
 type SourceName = ShortText
 
-instance IsString (Name s) where
+instance IsString Name where
   fromString s = SourceName (Short.fromString s) 0
   {-# inline fromString #-}
 
-splitName :: Name s -> (Name s, Name s)
+splitName :: Name -> (Name, Name)
 splitName (SourceName s n) = (SourceName s (2*n+1), SourceName s (2*n+2))
 splitName (MetaName s n) = (MetaName s (2*n+1), MetaName s (2*n+2))
 
-sourceName :: SourceName -> Name s
+sourceName :: SourceName -> Name
 sourceName s = SourceName s 0
 
 -- todo: ShortText or interning

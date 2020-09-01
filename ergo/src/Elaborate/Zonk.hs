@@ -7,14 +7,13 @@ import Data.Functor ((<&>))
 import Elaborate.Evaluation
 import Elaborate.Term
 import Elaborate.Value
-import Elaborate.Monad
 
 -- | Unfold all metas and evaluate meta-headed spines, but don't evaluate
 --   anything else.
-zonk :: forall s. Vals s -> TM s -> M s (TM s)
+zonk :: Vals -> TM -> IO TM
 zonk vs t0 = go t0 where
 
-  goSp :: TM s -> M s (Either (Val s) (TM s))
+  goSp :: TM -> IO (Either Val TM)
   goSp = \case
     Meta m -> readMeta m <&> \case
       Solved v -> Left v
