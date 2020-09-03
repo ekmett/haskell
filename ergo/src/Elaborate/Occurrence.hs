@@ -57,8 +57,8 @@ occurs d0 topX v0 = occurs' d0 mempty v0 where
       SNil           -> pure mempty
       SApp _ sp u    -> goSp ms sp >< go u
       SAppTel a sp u -> go a >< goSp ms sp >< go u
-      SProj1 sp      -> goSp ms sp
-      SProj2 sp      -> goSp ms sp
+      SCar sp        -> goSp ms sp
+      SCdr sp      -> goSp ms sp
 
     goBind t = t (VVar d) >>= occurs' (d + 1) ms0
 

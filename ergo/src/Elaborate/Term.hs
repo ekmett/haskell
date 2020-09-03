@@ -29,8 +29,8 @@ data Tm a
   | Rec !(Tm a)                        -- ^ Rec A
   | Tnil                               -- ^ []
   | Tcons !(Tm a) !(Tm a)              -- ^ t :: u
-  | Proj1 !(Tm a)                      -- ^ π₁ t
-  | Proj2 !(Tm a)                      -- ^ π₂ t
+  | Car !(Tm a)                        -- ^ π₁ t
+  | Cdr !(Tm a)                        -- ^ π₂ t
   | PiTel !Name !(Ty a) !(Ty a)        -- ^ {x : A⃗} → B
   | AppTel !(Ty a) !(Tm a) !(Tm a)     -- ^ t {u : A⃗}
   | LamTel !Name !(Ty a) !(Tm a)       -- ^ λ{x : A⃗}.t

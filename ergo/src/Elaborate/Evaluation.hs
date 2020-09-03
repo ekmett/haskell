@@ -1,6 +1,7 @@
 {-# Language LambdaCase #-}
 {-# Language BlockArguments #-}
 {-# Language ScopedTypeVariables #-}
+{-# Language BangPatterns #-}
 
 -- |
 -- Copyright :  (c) Edward Kmett 2020, András Kovács 2020
@@ -22,23 +23,23 @@ import Names
 
 valsLen :: Vals -> Int
 valsLen = go 0 where
-  go acc VNil        = acc
+  go !acc VNil        = acc
   go acc (VDef vs _) = go (acc + 1) vs
   go acc (VSkip vs)  = go (acc + 1) vs
 
 -- eval
 
-evalProj1 :: Val -> IO Val
-evalProj1 (VTcons t _) = pure t
-evalProj1 (VNe h sp) = pure $ VNe h (SProj1 sp)
-evalProj1 (VLamTel x a t) = evalLamTel pure x a t >>= evalProj1
-evalProj1 _ = panic
+evalCar :: Val -> IO Val
+evalCar (VTcons t _) = pure t
+evalCar (VNe h sp) = pure $ VNe h (SCar sp)
+evalCar (VLamTel x a t) = evalLamTel pure x a t >>= evalCar
+evalCar _ = panic
 
-evalProj2 :: Val -> IO Val
-evalProj2 (VTcons _ u) = pure u
-evalProj2 (VNe h sp) = pure $ VNe h (SProj2 sp)
-evalProj2 (VLamTel x a t) = evalLamTel pure x a t >>= evalProj2
-evalProj2 _ = panic
+evalCdr :: Val -> IO Val
+evalCdr (VTcons _ u) = pure u
+evalCdr (VNe h sp) = pure $ VNe h (SCdr sp)
+evalCdr (VLamTel x a t) = evalLamTel pure x a t >>= evalCdr
+evalCdr _ = panic
 
 evalVar :: Ix -> Vals -> Val
 evalVar 0 (VDef _ v) = v
@@ -77,9 +78,9 @@ evalAppTel ::  VTy -> Val -> Val -> IO Val
 evalAppTel a0 t u = force a0 >>= \case
   VTNil -> pure t
   VTCons _ _ as -> do
-    u1 <- evalProj1 u
+    u1 <- evalCar u
     u1v <- as u1
-    u2 <- evalProj2 u
+    u2 <- evalCdr u
     t' <- evalApp Implicit t u1
     evalAppTel u1v t' u2
   a -> case t of
@@ -100,8 +101,8 @@ evalAppSp h = go where
   go SNil             = pure h
   go (SApp i sp u)    = do sp' <- go sp; evalApp i sp' u
   go (SAppTel a sp u) = do sp' <- go sp; evalAppTel a sp' u
-  go (SProj1 sp)      = go sp >>= evalProj1
-  go (SProj2 sp)      = go sp >>= evalProj2
+  go (SCar sp)      = go sp >>= evalCar
+  go (SCdr sp)      = go sp >>= evalCdr
 
 force :: Val -> IO Val
 force = \case
@@ -141,8 +142,8 @@ eval vs = go where
     Rec a        -> VRec <$> go a
     Tnil         -> pure VTnil
     Tcons t u    -> VTcons <$> unsafeInterleaveIO (go t) <*> unsafeInterleaveIO (go u)
-    Proj1 t      -> go t >>= evalProj1
-    Proj2 t      -> go t >>= evalProj2
+    Car t        -> go t >>= evalCar
+    Cdr t        -> go t >>= evalCdr
     PiTel x a b  -> do
       a' <- unsafeInterleaveIO (go a)
       evalPiTel pure x a' (goBind b)
@@ -167,8 +168,8 @@ uneval d = go where
             HVar x  -> pure $ Var (d - x - 1)
           goSp (SApp i sp u) = App i <$> goSp sp <*> go u
           goSp (SAppTel a sp u) = AppTel <$> go a <*> goSp sp <*> go u
-          goSp (SProj1 sp) = Proj1 <$> goSp sp
-          goSp (SProj2 sp) = Proj2 <$> goSp sp
+          goSp (SCar sp) = Car <$> goSp sp
+          goSp (SCdr sp) = Cdr <$> goSp sp
       in forceSp sp0 >>= goSp
 
     VLam x i a t  -> Lam x i <$> go a <*> goBind t

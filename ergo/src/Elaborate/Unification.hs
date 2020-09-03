@@ -184,8 +184,8 @@ strengthen str0 = go where
     SNil           -> pure h
     SApp i sp u    -> App i <$> goSp h sp <*> go u
     SAppTel a sp u -> AppTel <$> go a <*> goSp h sp <*> go u
-    SProj1 sp      -> Proj1 <$> goSp h sp
-    SProj2 sp      -> Proj2 <$> goSp h sp
+    SCar sp      -> Car <$> goSp h sp
+    SCdr sp      -> Cdr <$> goSp h sp
 
 -- | Lift a `Str` over a bound variable.
 liftStr :: Str -> Str
@@ -301,8 +301,8 @@ checkSp s0 = do
         VVar x | HM.member x r -> throwIO $ NonLinearSpine x
                | otherwise     -> pure (HM.insert x d r, d + 1, x:xs)
         _    -> throwIO SpineNonVar
-    SProj1 _ -> throwIO SpineProjection
-    SProj2 _ -> throwIO SpineProjection
+    SCar _ -> throwIO SpineProjection
+    SCdr _ -> throwIO SpineProjection
 
 -- | May throw `UnifyError`.
 solveMeta :: Context -> Meta -> Spine -> Val -> IO ()

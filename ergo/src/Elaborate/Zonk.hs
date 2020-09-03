@@ -58,8 +58,8 @@ zonk vs t0 = go t0 where
     Rec a        -> Rec <$> go a
     Tnil         -> pure Tnil
     Tcons t u    -> Tcons <$> go t <*> go u
-    Proj1 t      -> Proj1 <$> go t
-    Proj2 t      -> Proj2 <$> go t
+    Car t        -> Car <$> go t
+    Cdr t        -> Cdr <$> go t
     PiTel x a b  -> PiTel x <$> go a <*> goBind b
     AppTel a t1 u -> goSp t1 >>= \case
       Left t  -> do

@@ -95,8 +95,8 @@ data Spine
   = SNil
   | SApp !Icit !Spine Val
   | SAppTel Val !Spine Val
-  | SProj1 !Spine
-  | SProj2 !Spine
+  | SCar !Spine
+  | SCdr !Spine
 
 type VTy = Val
 
