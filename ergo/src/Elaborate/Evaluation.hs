@@ -1,3 +1,4 @@
+{-# Language CPP #-}
 {-# Language LambdaCase #-}
 {-# Language BlockArguments #-}
 {-# Language ScopedTypeVariables #-}
@@ -19,7 +20,9 @@ import Elaborate.Term
 import Elaborate.Value
 import GHC.IO.Unsafe
 import Icit
+#ifdef FCIF
 import Names
+#endif
 
 valsLen :: Vals -> Int
 valsLen = go 0 where
@@ -28,18 +31,6 @@ valsLen = go 0 where
   go acc (VSkip vs)  = go (acc + 1) vs
 
 -- eval
-
-evalCar :: Val -> IO Val
-evalCar (VTcons t _) = pure t
-evalCar (VNe h sp) = pure $ VNe h (SCar sp)
-evalCar (VLamTel x a t) = evalLamTel pure x a t >>= evalCar
-evalCar _ = panic
-
-evalCdr :: Val -> IO Val
-evalCdr (VTcons _ u) = pure u
-evalCdr (VNe h sp) = pure $ VNe h (SCdr sp)
-evalCdr (VLamTel x a t) = evalLamTel pure x a t >>= evalCdr
-evalCdr _ = panic
 
 evalVar :: Ix -> Vals -> Val
 evalVar 0 (VDef _ v) = v
@@ -52,7 +43,23 @@ evalMeta :: Meta -> IO Val
 evalMeta m = readMeta m <&> \case
   Unsolved{} -> VMeta m
   Solved v -> v
+#ifdef FCIF
   _ -> panic
+#endif
+
+
+#ifdef FCIF
+evalCar :: Val -> IO Val
+evalCar (VTcons t _) = pure t
+evalCar (VNe h sp) = pure $ VNe h (SCar sp)
+evalCar (VLamTel x a t) = evalLamTel pure x a t >>= evalCar
+evalCar _ = panic
+
+evalCdr :: Val -> IO Val
+evalCdr (VTcons _ u) = pure u
+evalCdr (VNe h sp) = pure $ VNe h (SCdr sp)
+evalCdr (VLamTel x a t) = evalLamTel pure x a t >>= evalCdr
+evalCdr _ = panic
 
 evalPiTel :: EVal -> Name -> VTy -> EVal -> IO Val
 evalPiTel k x a0 b = force a0 >>= \case
@@ -87,31 +94,38 @@ evalAppTel a0 t u = force a0 >>= \case
     VNe h sp -> pure $ VNe h (SAppTel a sp u)
     VLamTel _ _ t' -> t' u
     _ -> panic
+#endif
 
 evalApp :: Icit -> Val -> Val -> IO Val
 evalApp _ (VLam _ _ _ t)  u = t u
 evalApp i (VNe h sp)      u = pure $ VNe h (SApp i sp u)
+#ifdef FCIF
 evalApp i (VLamTel x a t) u = do
   y <- evalLamTel pure x a t
   evalApp i y u
+#endif
 evalApp _                _ _ = panic
 
 evalAppSp :: Val -> Spine -> IO Val
 evalAppSp h = go where
   go SNil             = pure h
   go (SApp i sp u)    = do sp' <- go sp; evalApp i sp' u
+#ifdef FCIF
   go (SAppTel a sp u) = do sp' <- go sp; evalAppTel a sp' u
   go (SCar sp)      = go sp >>= evalCar
   go (SCdr sp)      = go sp >>= evalCdr
+#endif
 
 force :: Val -> IO Val
 force = \case
   v0@(VNe (HMeta m) sp) -> readMeta m >>= \case
     Unsolved{} -> pure v0
     Solved v   -> evalAppSp v sp >>= force
+#ifdef FCIF
     _ -> panic
   VPiTel x a b -> evalPiTel force x a b
   VLamTel x a t -> evalLamTel force x a t
+#endif
   v -> pure v
 
 forceSp :: Spine -> IO Spine
@@ -136,6 +150,7 @@ eval vs = go where
       t' <- unsafeInterleaveIO (go t)
       u' <- unsafeInterleaveIO (go u)
       evalApp i t' u'
+#ifdef FCIF
     Tel          -> pure VTel
     TNil         -> pure VTNil
     TCons x a b  -> unsafeInterleaveIO (go a) <&> \a' -> VTCons x a' (goBind b)
@@ -155,6 +170,7 @@ eval vs = go where
     LamTel x a t -> do
       a' <- unsafeInterleaveIO (go a)
       evalLamTel pure x a' (goBind t)
+#endif
     Skip t -> eval (VSkip vs) t
 
   goBind t x = eval (VDef vs x) t
@@ -167,14 +183,17 @@ uneval d = go where
             HMeta m -> pure $ Meta m
             HVar x  -> pure $ Var (d - x - 1)
           goSp (SApp i sp u) = App i <$> goSp sp <*> go u
+#ifdef FCIF
           goSp (SAppTel a sp u) = AppTel <$> go a <*> goSp sp <*> go u
           goSp (SCar sp) = Car <$> goSp sp
           goSp (SCdr sp) = Cdr <$> goSp sp
+#endif
       in forceSp sp0 >>= goSp
 
     VLam x i a t  -> Lam x i <$> go a <*> goBind t
     VPi x i a b   -> Pi x i <$> go a <*> goBind b
     VU            -> pure U
+#ifdef FCIF
     VTel          -> pure Tel
     VRec a        -> Rec <$> go a
     VTNil         -> pure TNil
@@ -183,6 +202,7 @@ uneval d = go where
     VTcons t u    -> Tcons <$> go t <*> go u
     VPiTel x a b  -> PiTel x <$> go a <*> goBind b
     VLamTel x a t -> LamTel x <$> go a <*> goBind t
+#endif
 
   goBind t = t (VVar d) >>= uneval (d + 1)
 

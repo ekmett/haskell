@@ -1,3 +1,4 @@
+{-# Language CPP #-}
 {-# Language ScopedTypeVariables #-}
 {-# Language LambdaCase #-}
 
@@ -23,6 +24,7 @@ zonk vs t0 = go t0 where
         u' <- eval vs u
         evalApp ni t u'
       Right t -> go u <&> \u' -> Right $ App ni t u'
+#ifdef FCIF
     AppTel a t1 u -> goSp t1 >>= \case
       Left t  -> do
         a' <- eval vs a
@@ -32,6 +34,7 @@ zonk vs t0 = go t0 where
         a' <- go a 
         u' <- go u
         pure $ Right $ AppTel a' t u'
+#endif
     t -> Right <$> zonk vs t
 
   goBind = zonk (VSkip vs)
@@ -41,7 +44,9 @@ zonk vs t0 = go t0 where
     Meta m       -> readMeta m >>= \case
       Solved v   -> uneval (valsLen vs) v
       Unsolved{} -> pure $ Meta m
+#ifdef FCIF
       _          -> panic
+#endif
     U            -> pure U
     Pi x i a b   -> Pi x i <$> go a <*> goBind b
     App ni t1 u   -> goSp t1 >>= \case
@@ -52,6 +57,8 @@ zonk vs t0 = go t0 where
       Right t -> App ni t <$> go u
     Lam x i a t  -> Lam x i <$> go a <*> goBind t
     Let x a t u  -> Let x <$> go a <*> go t <*> goBind u
+    Skip t       -> Skip <$> goBind t
+#ifdef FCIF
     Tel          -> pure Tel
     TNil         -> pure TNil
     TCons x t u  -> TCons x <$> go t <*> goBind u
@@ -72,4 +79,4 @@ zonk vs t0 = go t0 where
         u' <- go u
         pure $ AppTel a' t u'
     LamTel x a b -> LamTel x <$> go a <*> goBind b
-    Skip t       -> Skip <$> goBind t
+#endif

@@ -1,3 +1,4 @@
+{-# Language CPP #-}
 {-# Language PatternSynonyms #-}
 {-# Language MonoLocalBinds #-}
 {-# Language TemplateHaskell #-}
@@ -57,8 +58,10 @@ type BlockedBy = Metas
 data MetaEntry
   = Unsolved !Metas VTy
   | Solved !Val
+#ifdef FCIF
   | Constancy !Context !VTy !VTy !BlockedBy
   | Dropped
+#endif
 
 data SlotType = Def | Bound
   deriving (Eq,Ord,Show,Read,Bounded,Enum)
@@ -94,9 +97,11 @@ data Head
 data Spine
   = SNil
   | SApp !Icit !Spine Val
+#ifdef FCIF
   | SAppTel Val !Spine Val
   | SCar !Spine
   | SCdr !Spine
+#endif
 
 type VTy = Val
 
@@ -105,6 +110,7 @@ data Val
   | VPi !Name !Icit VTy EVTy
   | VLam !Name !Icit VTy EVal
   | VU
+#ifdef FCIF
   | VTel
   | VRec Val
   | VTNil
@@ -113,6 +119,7 @@ data Val
   | VTcons Val Val
   | VPiTel !Name Val EVal
   | VLamTel !Name Val EVal
+#endif
 
 type EVal = Val -> IO Val
 type EVTy = VTy -> IO VTy

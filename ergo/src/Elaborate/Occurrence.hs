@@ -1,3 +1,4 @@
+{-# Language CPP #-}
 {-# Language ImportQualifiedPost #-}
 {-# Language RankNTypes #-}
 {-# Language LambdaCase #-}
@@ -56,9 +57,11 @@ occurs d0 topX v0 = occurs' d0 mempty v0 where
     goSp ms sp0 = forceSp sp0 >>= \case
       SNil           -> pure mempty
       SApp _ sp u    -> goSp ms sp >< go u
+#ifdef FCIF
       SAppTel a sp u -> go a >< goSp ms sp >< go u
       SCar sp        -> goSp ms sp
       SCdr sp      -> goSp ms sp
+#endif
 
     goBind t = t (VVar d) >>= occurs' (d + 1) ms0
 
@@ -70,6 +73,7 @@ occurs d0 topX v0 = occurs' d0 mempty v0 where
       VPi _ _ a b   -> go a >< goBind b
       VLam _ _ a t  -> go a >< goBind t
       VU            -> pure mempty
+#ifdef FCIF
       VTel          -> pure mempty
       VRec a        -> go a
       VTNil         -> pure mempty
@@ -78,4 +82,5 @@ occurs d0 topX v0 = occurs' d0 mempty v0 where
       VTcons t u    -> go t >< go u
       VPiTel _ a b  -> go a >< goBind b
       VLamTel _ a t -> go a >< goBind t
+#endif
 {-# inline occurs #-}

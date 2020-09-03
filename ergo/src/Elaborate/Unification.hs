@@ -1,3 +1,4 @@
+{-# Language CPP #-}
 {-# Language LambdaCase #-}
 {-# Language BlockArguments #-}
 {-# Language ImportQualifiedPost #-}
@@ -23,14 +24,18 @@ module Elaborate.Unification where
 import Control.Exception
 import Control.Lens hiding (Context)
 import Data.Foldable (forM_)
+#ifdef FCIF
 import Data.HashSet qualified as HS
+#endif
 import Data.HashMap.Strict qualified as HM
 import Data.Maybe (isJust)
 import Elaborate.Error
 import Elaborate.Evaluation
 import Elaborate.Term
 import Elaborate.Value
+#ifdef FCIF
 import Elaborate.Occurrence
+#endif
 import Icit
 import Names
 import System.IO.Unsafe (unsafeInterleaveIO)
@@ -79,7 +84,9 @@ strengthen str0 = go where
     let prune' :: [Bool] -> Spine -> IO (Maybe [Bool])
         prune' acc SNil                    = pure (Just acc)
         prune' acc (SApp _ sp (VVar x))    = prune' (isJust (HM.lookup x (str0^.ren)) : acc) sp
+#ifdef FCIF
         prune' acc (SAppTel _ sp (VVar x)) = prune' (isJust (HM.lookup x (str0^.ren)) : acc) sp
+#endif
         prune' _   _                       = pure Nothing
 
     prune' [] sp0 >>= \case
@@ -102,18 +109,22 @@ strengthen str0 = go where
                 VPi x i a b -> do
                   r <- unsafeInterleaveIO $ b $ VVar (str^.cod)
                   Pi x i <$> strengthen str a <*> go' pr (liftStr str) r
+#ifdef FCIF
                 VPiTel x a b ->do
                   r <- unsafeInterleaveIO $ b $ VVar (str^.cod)
                   PiTel x <$> strengthen str a <*> go' pr (liftStr str) r
+#endif
                 _ -> panic
 
               go' (False:pr) str z = force z >>= \case
                 VPi _ _ _ b -> do
                   r <- unsafeInterleaveIO $ b $ VVar (str^.cod)
                   go' pr (skipStr str) r
+#ifdef FCIF
                 VPiTel _ _ b -> do
                   r <- unsafeInterleaveIO $ b $ VVar (str^.cod)
                   go' pr (skipStr str) r
+#endif
                 _ -> panic
 
           go' pruning (Str 0 0 mempty Nothing) metaTy
@@ -129,19 +140,23 @@ strengthen str0 = go where
                   VPi _ i _ b -> do
                     a' <- unsafeInterleaveIO $ b (VVar d)
                     go' pr a' (App i acc (Var (argNum - d - 1))) (d + 1)
+#ifdef FCIF
                   VPiTel _ a b -> do
                     a' <- unsafeInterleaveIO $ b (VVar d)
                     u <- unsafeInterleaveIO $ uneval argNum a
                     go' pr a' (AppTel u acc (Var (argNum - d - 1))) (d + 1)
+#endif
                   _ -> panic 
               go' (False:pr) z acc d = do
                 force z >>= \case
                   VPi _ _ _ b -> do
                     a' <- unsafeInterleaveIO $ b (VVar d)
                     go' pr a' acc (d + 1)
+#ifdef FCIF
                   VPiTel _ _ b -> do
                     a' <- unsafeInterleaveIO $ b (VVar d)
                     go' pr a' acc (d + 1)
+#endif
                   _ -> panic
 
         b <- body
@@ -168,6 +183,7 @@ strengthen str0 = go where
     VPi x i a b      -> Pi x i <$> go a <*> goBind b
     VLam x i a t'    -> Lam x i <$> go a <*> goBind t'
     VU               -> pure U
+#ifdef FCIF
     VTel             -> pure Tel
     VRec a           -> Rec <$> go a
     VTNil            -> pure TNil
@@ -176,6 +192,7 @@ strengthen str0 = go where
     VTcons t' u      -> Tcons <$> go t' <*> go u
     VPiTel x a b     -> PiTel x <$> go a <*> goBind b
     VLamTel x a t'   -> LamTel x <$> go a <*> goBind t'
+#endif
 
   goBind :: EVal -> IO TM
   goBind t = t (VVar (str0^.cod)) >>= strengthen (liftStr str0) 
@@ -183,9 +200,11 @@ strengthen str0 = go where
   goSp h = \case
     SNil           -> pure h
     SApp i sp u    -> App i <$> goSp h sp <*> go u
+#ifdef FCIF
     SAppTel a sp u -> AppTel <$> go a <*> goSp h sp <*> go u
     SCar sp      -> Car <$> goSp h sp
     SCdr sp      -> Cdr <$> goSp h sp
+#endif
 
 -- | Lift a `Str` over a bound variable.
 liftStr :: Str -> Str
@@ -199,9 +218,11 @@ closingTy :: Context -> TY -> IO TY
 closingTy cxt = go (cxt^.types) (cxt^.names) (cxt^.len) where
   go TyNil [] _ b = pure b
   go (TySnoc tys Def _) (_:ns) d b = go tys ns (d-1) (Skip b)
+#ifdef FCIF
   go (TySnoc tys Bound (VRec a)) (x:ns) d b = do
     a' <- uneval (d-1) a
     go tys ns (d-1) (PiTel x a' b)
+#endif
   go (TySnoc tys Bound a) (x:ns) d b = do
     a' <- uneval (d-1) a
     go tys ns (d-1) (Pi x Explicit a' b)
@@ -221,19 +242,24 @@ closingTm = go 0 where
       a' <- b (VVar d) 
       bd <- uneval d a 
       Lam x i bd <$> go (d + 1) a' (l-1) (drop 1 xs) rhs
+#ifdef FCIF
     VPiTel (getName xs -> x) _ b -> do
       a' <- b (VVar d)
       bd <- uneval d a
       LamTel x bd <$> go (d + 1) a' (l-1) (drop 1 xs) rhs
+#endif
     _ -> panic
 
+#ifdef FCIF
 newConstancy :: Context -> VTy -> EVal -> IO ()
 newConstancy cxt d c = do
   v <- c (VVar (cxt^.len))
   m <- newMeta $ Constancy cxt d v mempty
   tryConstancy m
+#endif
 
 tryConstancy :: Meta -> IO ()
+#ifdef FCIF
 tryConstancy constM = readMeta constM >>= \case
   Constancy cxt d c blockers -> do
     forM_ blockers \m ->
@@ -253,6 +279,9 @@ tryConstancy constM = readMeta constM >>= \case
             _ -> panic
         writeMeta constM $ Constancy cxt d c ms
   _ -> panic
+#else
+tryConstancy = panic
+#endif
 
 data SP = SP Spine {-# UNPACK #-} !Lvl
 
@@ -265,7 +294,9 @@ freshMeta' cxt v = do
   let vars :: Types -> SP
       vars TyNil                                      = SP SNil 0
       vars (TySnoc (vars -> SP sp d) Def _)           = SP sp (d + 1)
+#ifdef FCIF
       vars (TySnoc (vars -> SP sp d) Bound (VRec a')) = SP (SAppTel a' sp (VVar d)) (d + 1)
+#endif
       vars (TySnoc (vars -> SP sp d) Bound _)         = SP (SApp Explicit sp (VVar d)) (d + 1)
   case vars (cxt^.types) of
     SP sp _ -> (m,) <$> uneval (cxt^.len) (VNe (HMeta m) sp)
@@ -295,6 +326,7 @@ checkSp s0 = do
         VVar x | HM.member x r -> throwIO $ NonLinearSpine x
                | otherwise -> pure (HM.insert x d r, d + 1, x:xs)
         _      -> throwIO SpineNonVar
+#ifdef FCIF
     SAppTel _ sp u -> do
       (!r, !d, !xs) <- go sp
       force u >>= \case
@@ -303,6 +335,7 @@ checkSp s0 = do
         _    -> throwIO SpineNonVar
     SCar _ -> throwIO SpineProjection
     SCdr _ -> throwIO SpineProjection
+#endif
 
 -- | May throw `UnifyError`.
 solveMeta :: Context -> Meta -> Spine -> Val -> IO ()
@@ -350,12 +383,14 @@ unify cxt l r = go l r where
     Left{}  -> solveMeta cxt m' sp' (VNe (HMeta m) sp)
     Right{} -> solveMeta cxt m sp (VNe (HMeta m') sp')
 
+#ifdef FCIF
   implArity :: Context -> EVal -> IO Int
   implArity cxt' b = b (VVar (cxt'^.len)) >>= go' 0 (cxt'^.len + 1) where
     go' :: Int -> Int -> Val -> IO Int
     go' !acc ln a = force a >>= \case
       VPi _ Implicit _ b' -> b' (VVar ln) >>= go' (acc + 1) (ln + 1)
       _ -> pure acc
+#endif
 
   go t0 t0' = ((,) <$> force t0 <*> force t0') >>= \case
     (VLam x _ a t, VLam _ _ _ t')            -> goBind x a t t'
@@ -363,6 +398,7 @@ unify cxt l r = go l r where
     (t, VLam x' i' a' t')                    -> goBind x' a' (\ v -> evalApp i' t v) t'
     (VPi x i a b, VPi _ i' a' b') | i == i'  -> go a a' >> goBind x a b b'
     (VU, VU)                                 -> pure ()
+#ifdef FCIF
     (VTel, VTel)                             -> pure ()
     (VRec a, VRec a')                        -> go a a'
     (VTNil, VTNil)                           -> pure ()
@@ -373,6 +409,7 @@ unify cxt l r = go l r where
     (VLamTel x a t, VLamTel _  _ t')         -> goBind x (VRec a) t t'
     (VLamTel x a t, t')                      -> goBind x (VRec a) t (evalAppTel a t')
     (t, VLamTel x' a' t')                    -> goBind x' (VRec a') (evalAppTel a' t) t'
+#endif
     (VNe h sp, VNe h' sp') | h == h'         -> do
       fsp <- forceSp sp 
       fsp' <- forceSp sp'
@@ -380,7 +417,7 @@ unify cxt l r = go l r where
     (VNe (HMeta m) sp, VNe (HMeta m') sp')   -> flexFlex m sp m' sp'
     (VNe (HMeta m) sp, t')                   -> solveMeta cxt m sp t'
     (t, VNe (HMeta m') sp')                  -> solveMeta cxt m' sp' t
-
+#ifdef FCIF
     (VPiTel x a b, t@(VPi x' Implicit a' b')) -> do
       ia <- implArity cxt b
       ib <- implArity cxt b'
@@ -423,6 +460,7 @@ unify cxt l r = go l r where
       go a VTNil
       r' <- b VTnil
       go t r'
+#endif
     _ -> unifyError
 
   goBind x a t t' = do
@@ -434,5 +472,7 @@ unify cxt l r = go l r where
   goSp sp0 sp0' = case (sp0, sp0') of
     (SNil, SNil) -> pure ()
     (SApp i sp u, SApp i' sp' u') | i == i' -> goSp sp sp' >> go u u'
+#ifdef FCIF
     (SAppTel _ sp u, SAppTel _ sp' u')      -> goSp sp sp' >> go u u'
+#endif
     _ -> panic

@@ -1,3 +1,4 @@
+{-# Language CPP #-}
 {-# Language ImportQualifiedPost #-}
 {-# Language LambdaCase #-}
 {-# Language ViewPatterns #-}
@@ -143,6 +144,7 @@ check cxt topT ~topA0 = force topA0 >>= \ ftopA -> case (topT, ftopA) of
     a' <- uneval (cxt^.len) a
     pure $ Lam x Implicit a' t
 
+#ifdef FCIF
   -- inserting a new curried function lambda
   (t0, VNe (HMeta _) _) -> do
     -- x <- ("Γ"++) . show <$> readMeta nextMId
@@ -154,6 +156,7 @@ check cxt topT ~topA0 = force topA0 >>= \ ftopA -> case (topT, ftopA) of
     newConstancy cxt vdom a
     unifyWhile cxt topA0 (VPiTel x vdom a)
     pure $ LamTel x d t
+#endif
 
   (Raw.Let (sourceName -> x) a0 t0 u0, topA) -> do
     a <- check cxt a0 VU

@@ -1,3 +1,4 @@
+{-# Language CPP #-}
 {-# Language DeriveTraversable #-}
 
 -- |
@@ -22,7 +23,7 @@ data Tm a
   | Pi !Name !Icit !(Ty a) !(Ty a)     -- ^ (x : A) → B)  or  {x : A} → B
   | Lam !Name !Icit !(Ty a) !(Tm a)    -- ^ λ(x : A).t  or  λ{x : A}.t
   | App !Icit (Tm a) !(Tm a)           -- ^ t u  or  t {u}
-
+#ifdef FCIF
   | Tel                                -- ^ Tel
   | TNil                               -- ^ ε
   | TCons !Name !(Ty a) !(Ty a)        -- ^ (x : A) ▷ B
@@ -34,7 +35,7 @@ data Tm a
   | PiTel !Name !(Ty a) !(Ty a)        -- ^ {x : A⃗} → B
   | AppTel !(Ty a) !(Tm a) !(Tm a)     -- ^ t {u : A⃗}
   | LamTel !Name !(Ty a) !(Tm a)       -- ^ λ{x : A⃗}.t
-
+#endif
   | U                                  -- ^ U
   | Meta a                             -- ^ α
   | Skip !(Tm a)                       -- ^ explicit weakening for closing types
