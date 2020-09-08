@@ -1,0 +1,58 @@
+cabal-version: 3.4
+name: par
+version: 0
+synopsis: par
+description: a monad for work-stealing
+homepage: https://github.com/ekmett/haskell
+license: BSD-2-Clause OR Apache-2.0
+license-file: LICENSE.md
+author: Edward Kmett
+maintainer: Edward Kmett <ekmett@gmail.com>
+copyright: Copyright (c) 2020 Edward Kmett
+stability: experimental
+category: Control, Concurrent
+build-type: Simple
+extra-doc-files:
+  README.md,
+  CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/ekmett/haskell
+  subdir: par
+
+common base
+  default-language: Haskell2010
+  build-depends:
+    base >= 4.14 && < 5,
+    atomic-primops,
+    contravariant,
+    exceptions,
+    ghc-prim,
+    mwc-random,
+    primitive,
+    transformers,
+    unliftio-core,
+    vector
+    
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
+    -Wredundant-constraints -Widentities
+    -Wno-simplifiable-class-constraints
+
+library
+  import: base
+  hs-source-dirs: src
+  c-sources: cbits/holes.cmm
+  exposed-modules:
+    Par
+    Par.Backoff
+    Par.Counted
+    Par.Deque
+    Par.Exception
+    Par.Fiber
+    Par.Hole
+    Par.Monad
+    Par.Observer
+    Par.Subscription
+    Par.Util
