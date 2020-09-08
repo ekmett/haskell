@@ -1,6 +1,7 @@
 module Common.Ix 
-  ( Lvl
-  , top
+  ( Ix
+  , Lvl
+  , topLvl
   , lvlIx
   , ixLvl
   ) where

@@ -5,8 +5,9 @@
 {-# Language DataKinds #-}
 
 module Common.Internal.Ix 
-  ( Lvl(..)
-  , top
+  ( Ix
+  , Lvl(..)
+  , topLvl
   , lvlIx
   , ixLvl
   ) where
@@ -23,8 +24,8 @@ type role Lvl nominal
 newtype Lvl i = UnsafeLvl Int 
   deriving newtype (Show,Index)
 
-top :: N i -> Lvl (S n)
-top = coerce
+topLvl :: N i -> Lvl (S n)
+topLvl = coerce
 
 lvlIx :: N i -> Lvl i -> Ix i
 lvlIx n l = UnsafeFin (index n - index l - 1)
