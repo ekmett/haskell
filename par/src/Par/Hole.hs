@@ -11,8 +11,10 @@ module Par.Hole
   ( newHole
   , setHole
   , unsafeSetField
+  , unsafeGetField
   , sequenceIO
   , sequenceUnliftIO
+  , sequenceH
   ) where
 
 import Control.Monad.IO.Unlift
@@ -22,6 +24,7 @@ import GHC.Prim
 foreign import prim "newHolezh" newHole# :: Int# -> (# Any #)
 foreign import prim "setHolezh" setHole# :: Any -> Any -> (##)
 foreign import prim "unsafeSetFieldzh" unsafeSetField# :: Int# -> Any -> Any -> (##)
+foreign import prim "unsafeGetFieldzh" unsafeGetField# :: Int# -> Any -> (# Any #)
 
 -- | Allocate a value that can be overwritten *once* with 'setHole'.
 newHole :: IO a
@@ -40,6 +43,11 @@ unsafeSetField (I# i) !x y =
   case unsafeSetField# i (unsafeCoerce# x :: Any) (unsafeCoerce# y :: Any) of
     (##) -> pure ()
 {-# INLINEABLE unsafeSetField #-}
+
+unsafeGetField :: Int -> a -> IO b
+unsafeGetField (I# i) !x = case unsafeGetField# i (unsafeCoerce# x :: Any) of
+  (# y #) -> return (unsafeCoerce# y)
+{-# INLINEABLE unsafeGetField #-}
 
 sequenceUnliftIO :: MonadUnliftIO m => [m a] -> m [a]
 sequenceUnliftIO [] = pure []
@@ -70,3 +78,18 @@ sequenceIO (mx0:xs0) = do
       go back' xs
     go _ [] = pure ()
 {-# INLINEABLE sequenceIO #-}
+
+-- Sequence implemented in terms of holes
+sequenceH :: [IO a] -> IO [a]
+sequenceH xs0 = do
+    front <- newHole
+    go front xs0
+    return front
+  where
+  go back [] = setHole back []
+  go back (mx:xs) = do
+    x <- mx
+    back' <- newHole
+    setHole back (x:back')
+    go back' xs
+{-# INLINEABLE sequenceH #-}

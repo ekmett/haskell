@@ -47,3 +47,9 @@ unsafeSetFieldzh (W_ i, gcptr x, gcptr y) {
     return ();
   }
 }
+
+
+unsafeGetFieldzh (W_ i, gcptr p1) {
+  p1 = UNTAG(p1);
+  return (P_[p1 + SIZEOF_StgHeader + WDS(i)]);
+}
