@@ -13,6 +13,8 @@
 
 module Elaborate.Check where
 
+import Common.Icit
+import Common.Names
 import Control.Monad (unless)
 import Control.Lens hiding (Context)
 import Elaborate.Error
@@ -20,8 +22,6 @@ import Elaborate.Evaluation
 import Elaborate.Term
 import Elaborate.Value
 import Elaborate.Unification
-import Icit
-import Names
 import Source.Term qualified as Raw
 import System.IO.Unsafe (unsafeInterleaveIO)
 

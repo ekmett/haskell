@@ -11,8 +11,8 @@
 module Elaborate.Term where
 
 import Elaborate.Value
-import Names
-import Icit
+import Common.Names
+import Common.Icit
 
 type Ty = Tm
 type Ix = Int

@@ -60,6 +60,16 @@ library
   if flag(fcif)
     cpp-options: -DFCIF
   exposed-modules:
+    Common.Icit
+    Common.Ix
+    Common.Names
+    Common.Nat
+    Common.Skew
+    Common.Unique
+    Common.Use
+    Common.Internal.Ix
+    Common.Internal.Nat
+    Common.Internal.Skew
     Control.Monad.Sharing
     Driver
     Elaborate.Check
@@ -70,12 +80,8 @@ library
     Elaborate.Unification
     Elaborate.Value
     Elaborate.Zonk
-    Icit
-    Names
     Source.Parser
     Source.Term
-    Unique
-    Use
 
 executable ergo
   import: base

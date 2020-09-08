@@ -13,11 +13,11 @@
 
 module Elaborate.Error where
 
+import Common.Icit
+import Common.Names
 import Control.Exception
 import Elaborate.Term
 import Elaborate.Value
-import Icit
-import Names
 import Text.Megaparsec (SourcePos)
 
 data SpineError

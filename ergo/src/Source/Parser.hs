@@ -12,14 +12,14 @@
 
 module Source.Parser where
 
+import Common.Icit
+import Common.Names
 import Control.Monad (guard)
 import Data.Char
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.String 
 import Data.Void (Void)
-import Icit
-import Names
 import Source.Term
 import Prelude hiding (pi)
 import Text.Megaparsec

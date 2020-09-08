@@ -13,13 +13,13 @@
 
 module Elaborate.Value where
 
+import Common.Icit
+import Common.Names
+import Common.Unique
 import Control.Lens hiding (Context)
 import Data.Hashable
 import Data.HashSet
 import Data.IORef
-import Icit
-import Names
-import Unique
 import GHC.Exception
 import GHC.Stack.Types
 

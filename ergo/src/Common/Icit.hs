@@ -5,7 +5,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Icit where
+module Common.Icit where
 
 data Icit
   = Implicit

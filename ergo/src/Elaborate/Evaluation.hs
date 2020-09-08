@@ -15,14 +15,14 @@
 
 module Elaborate.Evaluation where
 
+import Common.Icit
+#ifdef FCIF
+import Common.Names
+#endif
 import Data.Functor ((<&>))
 import Elaborate.Term
 import Elaborate.Value
 import GHC.IO.Unsafe
-import Icit
-#ifdef FCIF
-import Names
-#endif
 
 valsLen :: Vals -> Int
 valsLen = go 0 where

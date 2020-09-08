@@ -11,7 +11,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Names 
+module Common.Names 
   ( SourceName
   , Name(..)
   , naming
@@ -20,12 +20,12 @@ module Names
   , sourceName
   ) where
 
+import Common.Unique
 import Control.Lens (review)
 import Control.Monad.Trans.State.Strict
 import Data.HashMap.Strict qualified as HM
 import Data.Hashable
 import Data.Text.Short as Short
-import Unique
 import Numeric.Lens (base)
 import Data.String
 import GHC.Generics

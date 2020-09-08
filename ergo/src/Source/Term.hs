@@ -8,8 +8,8 @@
 
 module Source.Term where
 
-import Icit
-import Names
+import Common.Icit
+import Common.Names
 import Text.Megaparsec (SourcePos)
 
 data Term

@@ -21,6 +21,8 @@
 
 module Elaborate.Unification where
 
+import Common.Icit
+import Common.Names
 import Control.Exception
 import Control.Lens hiding (Context)
 import Data.Foldable (forM_)
@@ -36,8 +38,6 @@ import Elaborate.Value
 #ifdef FCIF
 import Elaborate.Occurrence
 #endif
-import Icit
-import Names
 import System.IO.Unsafe (unsafeInterleaveIO)
 
 lvlName :: Int -> [Name] -> Lvl -> Name

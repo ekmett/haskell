@@ -9,7 +9,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Unique 
+module Common.Unique 
   ( Unique
   , newUnique
   ) where

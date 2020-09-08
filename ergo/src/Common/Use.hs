@@ -10,7 +10,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Use
+module Common.Use
   ( Use(..)
   , ω 
   , Scalable(..)
