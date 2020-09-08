@@ -33,3 +33,17 @@ setHolezh (gcptr p1, gcptr p2) {
     return ();
   }
 }
+
+unsafeSetFieldzh (W_ i, gcptr x, gcptr y) {
+  W_ bd;
+  x = UNTAG(x);
+  P_[x + SIZEOF_StgHeader + WDS(i)] = y; // write in memory
+
+  bd = Bdescr(x);
+  if (bdescr_gen_no(bd) != 0 :: bits16) {
+    recordMutableCap(x, TO_W_(bdescr_gen_no(bd)));
+    return ();
+  } else {
+    return ();
+  }
+}
