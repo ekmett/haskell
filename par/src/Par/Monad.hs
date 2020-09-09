@@ -4,6 +4,7 @@
 {-# Language DerivingVia #-}
 {-# Language OverloadedLists #-}
 {-# Language RecordWildCards #-}
+{-# Language TupleSections #-}
 {-# Language TypeFamilies #-}
 module Par.Monad where
 
@@ -25,7 +26,7 @@ import Par.Fiber
 import System.Random.MWC as MWC
 
 newtype Par a = Par { unPar :: (a -> Fiber ()) -> Fiber () }
-  deriving 
+  deriving
   ( Functor
   , Applicative
   , Monad
@@ -42,9 +43,9 @@ fork m = Par \k -> do
   defer $ k ()
   unPar m \_ -> schedule
 
---interleave :: Par a -> Par a 
+--interleave :: Par a -> Par a
 --interleave m = Par \k -> do
-  
+
 (<$!>) :: Monad m => (a -> b) -> m a -> m b
 f <$!> m = do
   v <- m
@@ -79,8 +80,8 @@ runPar :: Par a -> IO a
 runPar m = do
   r <- newEmptyMVar
   runPar_ do
-     a <- m
-     liftIO $ putMVar r a
+    a <- m
+    liftIO $ putMVar r a
   readMVar r
 
 newtype IVar a = IVar (IORef (Either a (Counted (a -> Fiber ()))))
@@ -89,21 +90,29 @@ newIVar :: Par (IVar a)
 newIVar = liftIO $ IVar <$> newIORef (Right [])
 
 readIVar :: IVar a -> Par a
-readIVar (IVar r) = Par $ \k -> mask_ $ join $ liftIO $ atomicModifyIORef' r $ \case
+readIVar (IVar r) = Par \k -> mask_ $ join $ liftIO $ atomicModifyIORef' r \case
   l@(Left a) -> (l, k a)
-  Right ks   -> (Right (k:+ks), addKarma (-1) >> schedule)
+  Right ks   -> (Right (k:+ks),) do
+    addKarma (-1)
+    schedule
 
 writeIVar :: Eq a => IVar a -> a -> Par ()
-writeIVar (IVar r) a = Par $ \k -> mask_ $ join $ liftIO $ atomicModifyIORef' r $ \case
+writeIVar (IVar r) a = Par \k -> mask_ $ join $ liftIO $ atomicModifyIORef' r \case
   l@(Left b)
     | a == b    -> (l, k ())
-    | otherwise -> (l, liftIO $ throwM Contradiction)
-  Right ks      -> (Left a, do for_ ks (\k' -> defer $ k' a); addKarma (length ks); k () )
+    | otherwise -> (l, throwM Contradiction)
+  Right ks      -> (Left a,) do
+    for_ ks \k' -> defer $ k' a
+    addKarma (length ks)
+    k ()
 
 unsafeWriteIVar :: IVar a -> a -> Par ()
-unsafeWriteIVar (IVar r) a = Par $ \k  -> mask_ $ join $ liftIO $ atomicModifyIORef' r $ \case
+unsafeWriteIVar (IVar r) a = Par \k  -> mask_ $ join $ liftIO $ atomicModifyIORef' r \case
   l@Left{} -> (l, k ())
-  Right ks -> (Left a, do for_ ks (\k' -> defer $ k' a); addKarma (length ks); k () )
+  Right ks -> (Left a,) do
+    for_ ks \k' -> defer $ k' a
+    addKarma (length ks)
+    k ()
 
 (|*|) :: Par (a -> b) -> Par a -> Par b
 pf |*| pa = do
