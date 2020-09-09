@@ -15,6 +15,7 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Cont
 import Control.Monad.Primitive
+import Data.Atomics.Counter
 import Data.IORef
 import Data.Foldable
 import Data.Primitive.Array
@@ -62,19 +63,21 @@ runPar_ (Par m) = do
   ws <- for [0..n-1] \ident -> do
     pool <- Deque.empty
     seed <- MWC.create
-    karma <- newIORef 0
-    workers <- newArray (n-1) (fail "PANIC! runPar_ missing worker")
+    karma <- newCounter 0
+    peers <- newArray (n-1) (fail "PANIC! runPar_ missing worker")
     return (Worker {..}, steal pool)
   let iws = init ws
-      lws = last ws
-  forM_ ws \(i,_) -> forM_ iws \(j,s) -> writeArray (workers i) (ident j) s
-  forM_ iws \(i,_) -> do
-    writeArray (workers i) (ident i) (snd lws)
-    forkOn (k + 1 + ident i) (runFiber schedule i)
-  let ks = karma . fst <$!> ws
-  runFiber (m \_ -> schedule) (fst lws)
-  d <- foldlM (\x i -> do y <- readIORef i; return $! x + y) 0 ks
-  when (d < 0) $ throwIO BlockedIndefinitelyOnIVar
+      (lw,ls) = last ws
+  for_ ws \(i,_) ->
+    for_ iws \(j,s) ->
+      writeArray (peers i) (ident j) s
+  for_ iws \(i,_) -> do
+    writeArray (peers i) (ident i) ls
+    forkOn (k + 1 + ident i) do
+      runFiber schedule i
+  runFiber (m \_ -> schedule) lw
+  karma <- foldlM (\x (w,_) -> (x +) <$!> readCounter (karma w)) 0 ws
+  when (karma < 0) $ throwIO BlockedIndefinitelyOnIVar
 
 runPar :: Par a -> IO a
 runPar m = do

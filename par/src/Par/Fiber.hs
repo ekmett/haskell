@@ -21,18 +21,19 @@ import Data.Primitive.Array
 import Par.Counted
 import Par.Deque as Deque
 import System.Random.MWC
+import Data.Atomics.Counter
 
 -- internal state of a Worker
 data Worker = Worker
   { ident   :: {-# UNPACK #-} !Int
   , pool    :: !(Deque (Fiber ()))
-  , workers :: !(MutableArray RealWorld (IO (Maybe (Fiber ())))) -- how to steal. These will get shuffled incrementally
+  , peers   :: {-# UNPACK #-} !(MutableArray RealWorld (IO (Maybe (Fiber ()))))
   , idlers  :: {-# UNPACK #-} !(IORef (Counted (MVar (Fiber ()))))
-  , seed    :: !(Gen RealWorld)
-  , karma   :: {-# UNPACK #-} !(IORef Int)
+  , seed    :: {-# UNPACK #-} !(Gen RealWorld)
+  , karma   :: {-# UNPACK #-} !AtomicCounter
   }
 
--- TODO: change workers to just contain an IO action that can do stealing. This prevents us from holding the entire other worker alive and makes a safer back-end.
+-- TODO: change peers to just contain an IO action that can do stealing. This prevents us from holding the entire other worker alive and makes a safer back-end.
 
 newtype Fiber a = Fiber { runFiber :: Worker -> IO a }
   deriving 
@@ -52,23 +53,23 @@ schedule = Fiber \ s@Worker{..} -> pop pool >>= \case
   Just t -> do
     runFiber t s
   Nothing 
-    | n <- sizeofMutableArray workers -> 
+    | n <- sizeofMutableArray peers -> 
       when (n > 0) do
         runFiber (interview (n-1)) s
 
 -- | Go door to door randomly looking for work. Requires there to be at least one door to knock on.
 interview :: Int -> Fiber ()
 interview i
-  | i > 0 = Fiber \s@Worker{workers, seed} -> do
+  | i > 0 = Fiber \s@Worker{peers, seed} -> do
     j <- uniformR (0,i) seed -- perform an on-line Knuth shuffle step
-    a <- readArray workers i
-    b <- readArray workers j
-    writeArray workers i b
-    writeArray workers j a
+    a <- readArray peers i
+    b <- readArray peers j
+    writeArray peers i b
+    writeArray peers j a
     m <- liftIO b
     runFiber (fromMaybe (interview (i-1)) m) s
-  | otherwise = Fiber \s@Worker{workers} -> do
-    b <- readArray workers 0
+  | otherwise = Fiber \s@Worker{peers} -> do
+    b <- readArray peers 0
     m <- liftIO b
     runFiber (fromMaybe idle m) s
 
@@ -81,7 +82,7 @@ idle :: Fiber ()
 idle = Fiber \s@Worker{..} -> do
   m <- newEmptyMVar
   is <- atomicModifyIORef idlers \is -> (m :+ is,is)
-  if length is == sizeofMutableArray workers
+  if length is == sizeofMutableArray peers
   then for_ is \i -> putMVar i $ pure () -- shut it down. we're the last idler.
   else do
     t <- takeMVar m -- We were given this, we didn't steal it. Really!
@@ -99,4 +100,4 @@ defer t = Fiber \Worker{idlers,pool} -> do
 
 -- | If the computation ends and we have globally accumulated negative karma then somebody, somewhere, is blocked.
 addKarma :: Int -> Fiber ()
-addKarma k = Fiber \ Worker{karma} -> modifyIORef' karma (k+)
+addKarma k = Fiber \ Worker{karma} -> incrCounter_ k karma

@@ -2,10 +2,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -fobject-code #-}
 
 -- |
--- Copyright   :  (C) 2012-15 Edward Kmett, Ryan Newton
+-- Copyright   :  (C) 2012-2020 Edward Kmett, Ryan Newton
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
 -- Stability   :  experimental
@@ -55,7 +56,7 @@ import Prelude hiding (null)
 -- where the dequeue-only 'steal' side can be used concurrently, but the \"local\" side may
 -- that provides 'push' and 'pop' can only be used from a single owner thread.
 data Deque a = Deque
-  { bottom, top :: {-# UNPACK #-} !AtomicCounter -- TODO: would it be worth making one larger MutableByteArray# and then putting these at least a cache line apart to avoid conflict?
+  { bottom, top :: {-# UNPACK #-} !AtomicCounter
   , array  :: {-# UNPACK #-} !(IORef (MVector RealWorld a))
   }
 
@@ -69,12 +70,12 @@ data Deque a = Deque
 -- >>> steal q
 -- Nothing
 empty :: (PrimMonad m, PrimState m ~ RealWorld) => m (Deque a)
-empty = ioToPrim $ do
+empty = ioToPrim do
   bottom <- newCounter 0 -- try to allocate them a bit separated
   v <- MV.new 32
   array <- newIORef v
   top <- newCounter 0
-  return Deque{..}
+  pure Deque{..}
 
 -- | Create a new 'Deque' with one element in it.
 --
@@ -86,13 +87,13 @@ empty = ioToPrim $ do
 -- >>> pop q
 -- Nothing
 singleton :: (PrimMonad m, PrimState m ~ RealWorld) => a -> m (Deque a)
-singleton a = ioToPrim $ do
+singleton a = ioToPrim do
   bottom <- newCounter 1
   v <- MV.new 32
   MV.unsafeWrite v 0 a
   array <- newIORef v
   top <- newCounter 0
-  return Deque{..}
+  pure Deque{..}
 
 -- | Generate a work-stealing 'Deque' of elements from a list.
 --
@@ -112,21 +113,21 @@ singleton a = ioToPrim $ do
 -- >>> steal p
 -- Just 4
 fromList :: (PrimMonad m, PrimState m ~ RealWorld) => [a] -> m (Deque a)
-fromList as = ioToPrim $ do
+fromList as = ioToPrim do
   v <- V.unsafeThaw (V.reverse (V.fromList as)) -- TODO: pad this out to an initial 32 entries?
   bottom <- newCounter (MV.length v)
   array <- newIORef v
   top <- newCounter 0
-  return Deque{..}
+  pure Deque{..}
 
 -- | Generate a work-stealing 'Deque' of elements from a list of known length.
 fromListN :: (PrimMonad m, PrimState m ~ RealWorld) => Int -> [a] -> m (Deque a)
-fromListN n as = ioToPrim $ do
+fromListN n as = ioToPrim do
   v <- V.unsafeThaw (V.reverse (V.fromListN n as))
   bottom <- newCounter (MV.length v)
   array <- newIORef v
   top <- newCounter 0
-  return Deque{..}
+  pure Deque{..}
 
 -- | @null@ returns 'True' if the 'Deque' is definitely empty.
 --
@@ -138,24 +139,23 @@ fromListN n as = ioToPrim $ do
 -- >>> null q
 -- True
 null :: (PrimMonad m, PrimState m ~ RealWorld) => Deque a -> m Bool
-null Deque{..} = ioToPrim $  do
+null Deque{..} = ioToPrim do
   b <- readCounter bottom
   t <- readCounter top
-  let sz = b - t
-  return (sz <= 0)
+  pure $ b - t <= 0
 
 -- | Compute a lower and upper bound on the number of elements left in the 'Deque'.
 --
 -- Under contention from stealing threads or when used by a stealing thread these
 -- numbers may well differ.
 size :: (PrimMonad m, PrimState m ~ RealWorld) => Deque a -> m (Int, Int)
-size Deque{..} = ioToPrim $ do
+size Deque{..} = ioToPrim do
   b1 <- readCounter bottom
-  t  <- readCounter top
+  t <- readCounter top
   b2 <- readCounter bottom
   let sz1 = b1 - t -- always the lower bound on x86, due to lack of load reordering
       sz2 = b2 - t -- always the upper bound on x86, due to lack of load reordering
-  return (min sz1 sz2, max sz1 sz2)
+  pure (min sz1 sz2, max sz1 sz2)
 
 -- * Queue Operations
 
@@ -187,9 +187,9 @@ size Deque{..} = ioToPrim $ do
 -- >>> steal p
 -- Nothing
 push :: (PrimMonad m, PrimState m ~ RealWorld) => a -> Deque a -> m ()
-push obj Deque{..} = ioToPrim $ do
-  b   <- readCounter bottom
-  t   <- readCounter top
+push obj Deque{..} = ioToPrim do
+  b <- readCounter bottom
+  t <- readCounter top
   arr <- readIORef array
   let len = MV.length arr
       sz = b - t
@@ -197,8 +197,7 @@ push obj Deque{..} = ioToPrim $ do
   arr' <- if sz < len - 1 then return arr else do
     arr' <- growCirc t b arr -- Double in size, don't change b/t.
     -- Only a single thread will do this!:
-    writeIORef array arr'
-    return arr'
+    arr' <$ writeIORef array arr'
 
   putCirc arr' b obj
   {-
@@ -210,12 +209,11 @@ push obj Deque{..} = ioToPrim $ do
      issue concretely hit me on ARMv7 multi-core CPUs
    -}
   writeBarrier
-  writeCounter bottom (b+1)
-  return ()
+  () <$ writeCounter bottom (b+1)
 
 -- TODO: consolidate the writes behind one barrier!
 pushes :: (PrimMonad m, PrimState m ~ RealWorld, Foldable f) => f a -> Deque a -> m ()
-pushes objs d = ioToPrim $ for_ (Reverse objs) $ \a -> push a d
+pushes objs d = ioToPrim $ for_ (Reverse objs) \a -> push a d
 {-# INLINE pushes #-}
 
 -- | This is the work-stealing dequeue operation.
@@ -227,49 +225,51 @@ pushes objs d = ioToPrim $ for_ (Reverse objs) $ \a -> push a d
 --
 -- However, at least one of the concurrently stealing threads will succeed.
 steal :: (PrimMonad m, PrimState m ~ RealWorld) => Deque a -> m (Maybe a)
-steal Deque{..} = ioToPrim $ do
+steal Deque{..} = ioToPrim do
   -- NB. these loads must be ordered, otherwise there is a race
   -- between steal and pop.
-  tt  <- readCounterForCAS top
+  tt <- readCounterForCAS top
   loadLoadBarrier
-  b   <- readCounter bottom
+  b <- readCounter bottom
   arr <- readIORef array
   let t = peekCTicket tt
       sz = b - t
-  if sz <= 0 then return Nothing else do
+  if sz <= 0 then pure Nothing else do
     a <- getCirc arr t
     (b',_) <- casCounter top tt (t+1)
-    return $! if b' then Just a
-                    else Nothing -- Someone beat us, abort
+    pure $!
+      if b'
+      then Just a
+      else Nothing -- Someone beat us, abort
 
 -- | Locally pop the 'Deque'. This is not a thread safe operation, and should
 -- only be invoked on from the thread that \"owns\" the 'Deque'.
 pop :: (PrimMonad m, PrimState m ~ RealWorld) => Deque a -> m (Maybe a)
-pop Deque{..} = ioToPrim $ do
-  b0  <- readCounter bottom
+pop Deque{..} = ioToPrim do
+  b0 <- readCounter bottom
   arr <- readIORef array
-  b   <- evaluate (b0-1)
+  b <- evaluate (b0-1)
   writeCounter bottom b
 
   -- very important that the following read of q->top does not occur
   -- before the earlier write to q->bottom.
   storeLoadBarrier
-  tt   <- readCounterForCAS top
+  tt <- readCounterForCAS top
   let t = peekCTicket tt
       sz = b - t
   if sz < 0
-  then do
-    writeCounter bottom t
-    return Nothing
+  then Nothing <$ writeCounter bottom t
   else do
     obj <- getCirc arr b
     if sz > 0
-    then return (Just obj)
+    then pure (Just obj)
     else do
       (b',_) <- casCounter top tt (t+1)
       writeCounter bottom (t+1)
-      return $! if b' then Just obj
-                      else Nothing
+      pure $!
+        if b'
+        then Just obj
+        else Nothing
 
 -- * Circular array routines:
 
@@ -278,11 +278,11 @@ growCirc :: Int -> Int -> MVector RealWorld a -> IO (MVector RealWorld a)
 growCirc s e old = do
   let len = MV.length old
   new <- MV.unsafeNew (len + len)
-  forN_ s e $ \i -> do
+  forN_ s e \i -> do
     x <- getCirc old i
     _ <- evaluate x
     putCirc new i x
-  return new
+  pure new
 {-# INLINE growCirc #-}
 
 getCirc :: MVector RealWorld a -> Int -> IO a
