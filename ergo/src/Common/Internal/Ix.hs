@@ -14,7 +14,7 @@ module Common.Internal.Ix
 
 import Common.Internal.Nat
 import Data.Coerce
-import GHC.Types (Type)
+import Data.Kind (Type)
 import GHC.TypeNats
 
 type Ix = Fin

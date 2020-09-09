@@ -15,9 +15,9 @@ module Common.Internal.Skew
   ) where
 
 import Common.Internal.Nat
-import GHC.Types (Type)
 import GHC.TypeNats
 import Data.Bits (unsafeShiftR)
+import Data.Kind
 
 type Tree :: Nat -> Nat -> Type -> Type
 type role Tree nominal nominal representational

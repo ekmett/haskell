@@ -20,8 +20,8 @@ module Common.Internal.Nat
   , Fin(UnsafeFin,Z,S)
   ) where
 
+import Data.Kind
 import Data.Type.Equality
-import GHC.Types (Type)
 import GHC.TypeNats
 import Unsafe.Coerce
 

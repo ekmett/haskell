@@ -27,3 +27,4 @@ newDriverState = stToPrim $ DriverState
   <*> newMutVar mempty
   <*> newMutVar mempty
   <*> newMutVar mempty
+
