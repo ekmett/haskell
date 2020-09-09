@@ -8,7 +8,7 @@
 module Par.Fiber where
 
 import Control.Concurrent.MVar
-import Control.Monad (join, unless)
+import Control.Monad (join, when, unless)
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
@@ -26,11 +26,10 @@ import System.Random.MWC
 data Worker = Worker
   { ident   :: {-# UNPACK #-} !Int
   , pool    :: !(Deque (Fiber ()))
-  , workers :: !(MutableArray RealWorld Worker) -- Other Workers. They will get shuffled as we schedule work stealing
+  , workers :: !(MutableArray RealWorld (IO (Maybe (Fiber ())))) -- how to steal. These will get shuffled incrementally
   , idlers  :: {-# UNPACK #-} !(IORef (Counted (MVar (Fiber ()))))
   , seed    :: !(Gen RealWorld)
   , karma   :: {-# UNPACK #-} !(IORef Int)
-  , fast    :: {-# UNPACK #-} !(IORef Bool)
   }
 
 -- TODO: change workers to just contain an IO action that can do stealing. This prevents us from holding the entire other worker alive and makes a safer back-end.
@@ -51,14 +50,11 @@ instance PrimMonad Fiber where
 schedule :: Fiber ()
 schedule = Fiber \ s@Worker{..} -> pop pool >>= \case
   Just t -> do
-    writeIORef fast True
     runFiber t s
-  Nothing
-    | n > 0 -> do
-      writeIORef fast False
-      runFiber (interview (n-1)) s
-    | otherwise -> return ()
-    where n = sizeofMutableArray workers
+  Nothing 
+    | n <- sizeofMutableArray workers -> 
+      when (n > 0) do
+        runFiber (interview (n-1)) s
 
 -- | Go door to door randomly looking for work. Requires there to be at least one door to knock on.
 interview :: Int -> Fiber ()
@@ -69,18 +65,16 @@ interview i
     b <- readArray workers j
     writeArray workers i b
     writeArray workers j a
-    m <- steal (pool b)
+    m <- liftIO b
     runFiber (fromMaybe (interview (i-1)) m) s
   | otherwise = Fiber \s@Worker{workers} -> do
     b <- readArray workers 0
-    m <- steal (pool b)
+    m <- liftIO b
     runFiber (fromMaybe idle m) s
 
 -- | We have a hot tip from somebody with a job opening!
-referral :: Worker -> Fiber ()
-referral b = do
-  m <- steal (pool b)
-  fromMaybe schedule m
+referral :: IO (Maybe (Fiber ())) -> Fiber ()
+referral b = liftIO b >>= fromMaybe schedule
 
 -- | Give up and wait for somebody to wake us up.
 idle :: Fiber ()
@@ -91,17 +85,16 @@ idle = Fiber \s@Worker{..} -> do
   then for_ is \i -> putMVar i $ pure () -- shut it down. we're the last idler.
   else do
     t <- takeMVar m -- We were given this, we didn't steal it. Really!
-    writeIORef fast True
     runFiber t s
 
 -- | Spawn a background task. We first put it into our job queue, and then we wake up an idler if there are any and have them try to steal it.
 defer :: Fiber () -> Fiber ()
-defer t = Fiber \s@Worker{idlers,pool} -> do
+defer t = Fiber \Worker{idlers,pool} -> do
   xs <- readIORef idlers
   push t pool
   unless (Prelude.null xs) $
     join $ atomicModifyIORef idlers \case
-       i:+is -> (is, putMVar i $ referral s)
+       i:+is -> (is, putMVar i $ referral $ steal pool)
        _     -> ([], return ())
 
 -- | If the computation ends and we have globally accumulated negative karma then somebody, somewhere, is blocked.

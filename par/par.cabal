@@ -43,7 +43,6 @@ common base
 library
   import: base
   hs-source-dirs: src
-  c-sources: cbits/holes.cmm
   exposed-modules:
     Par
     Par.Backoff
@@ -51,7 +50,6 @@ library
     Par.Deque
     Par.Exception
     Par.Fiber
-    Par.Hole
     Par.Monad
     Par.Observer
     Par.Subscription
