@@ -1,2 +1,5 @@
 - ignore: {name: Reduce duplication}
 - ignore: {name: Unused LANGUAGE pragma, within: Par.Fiber }
+- ignore: {name: Use const}
+- ignore: {name: Avoid lambda using `infix`}
+

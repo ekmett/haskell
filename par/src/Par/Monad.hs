@@ -44,9 +44,6 @@ fork m = Par \k -> do
   defer $ k ()
   unPar m \_ -> schedule
 
---interleave :: Par a -> Par a
---interleave m = Par \k -> do
-
 (<$!>) :: Monad m => (a -> b) -> m a -> m b
 f <$!> m = do
   v <- m
@@ -126,4 +123,24 @@ pf |*| pa = do
   f <- pf
   f <$> readIVar ra
 
+{-
+(*|) :: Par a -> Par b -> Par b
+pa *| pb = do
+  fork pa
+  pb
+(|*) :: Par a -> Par b -> Par a
+pa |* pb = do
+  fork pb
+  pa
+
 infixl 4 |*|
+
+newtype Conc a = Conc { runConc :: Par a }
+  deriving Functor
+
+instance Applicative Conc where
+  pure a = Conc (pure a)
+  Conc p <*> Conc q = Conc (p |*| q)
+  Conc p  *> Conc q = Conc (p  *| q)
+  Conc p <*  Conc q = Conc (p |*  q)
+-}
