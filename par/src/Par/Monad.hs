@@ -1,7 +1,8 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
+{-# Language CPP #-}
+{-# Language LambdaCase #-}
 {-# Language BlockArguments #-}
 {-# Language DerivingVia #-}
+{-# Language RankNTypes #-}
 {-# Language OverloadedLists #-}
 {-# Language RecordWildCards #-}
 {-# Language TupleSections #-}
@@ -83,6 +84,45 @@ runPar m = do
     a <- m
     liftIO $ putMVar r a
   readMVar r
+
+sync :: (((forall a. Par a -> Par ()) -> Par b)) -> Par b
+sync batch = Par \k -> do
+  c <- liftIO $ newCounter 1
+  result <- liftIO $ newEmptyMVar
+  let
+    barrier :: Fiber ()
+    barrier = liftIO (incrCounter (-1) c) >>= \case
+      0 -> liftIO (readMVar result) >>= k
+      _ -> schedule
+    spawn :: Par a -> Par ()
+    spawn job = Par \k' -> do
+      defer $ k' ()
+      liftIO $ incrCounter_ 1 c
+      unPar job \_ -> barrier
+  unPar (batch spawn) \b -> do
+    liftIO $ putMVar result b
+    barrier
+
+-- sync_ \spawn -> do
+--   spawn x
+--   spawn y
+--   spawn z
+
+sync_ :: forall b. (((forall a. Par a -> Par ()) -> Par b)) -> Par ()
+sync_ batch = Par \k -> do
+  c <- liftIO $ newCounter 1
+  let
+    barrier :: Fiber ()
+    barrier = liftIO (incrCounter (-1) c) >>= \case
+      0 -> k ()
+      _ -> schedule
+    spawn :: Par a -> Par ()
+    spawn job = Par \k' -> do
+      defer $ k' ()
+      liftIO $ incrCounter_ 1 c
+      unPar job \_ -> barrier
+      barrier
+  unPar (batch spawn) \_ -> barrier
 
 newtype IVar a = IVar (IORef (Either a (Counted (a -> Fiber ()))))
 
