@@ -65,11 +65,13 @@ library
     Common.Names
     Common.Nat
     Common.Skew
+    Common.SparseSet
     Common.Unique
     Common.Use
     Common.Internal.Ix
     Common.Internal.Nat
     Common.Internal.Skew
+    Common.Internal.SparseSet
     Control.Monad.Sharing
     Driver
     Elaborate.Check

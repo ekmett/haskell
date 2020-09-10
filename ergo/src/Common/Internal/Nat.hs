@@ -11,7 +11,7 @@
 {-# Language RankNTypes #-}
 
 module Common.Internal.Nat
-  ( Index(..)
+  ( ToInt(..)
   , type Z
   , type S
   , wk
@@ -25,49 +25,49 @@ import Data.Type.Equality
 import GHC.TypeNats
 import Unsafe.Coerce
 
-class Index t where
-  index :: t -> Int
+class ToInt t where
+  int :: t -> Int
 
-instance Index Int where
-  index = id
+instance ToInt Int where
+  int = id
 
-type Z = 0    
-type S n = 1 + n    
-    
-wk :: forall i r proxy. proxy i -> (i <= S i => r) -> r    
-wk _ r = case unsafeCoerce Refl of    
-  (Refl :: (i <=? S i) :~: 'True) -> r    
-    
-type N :: Nat -> Type    
-type role N nominal    
-newtype N i = UnsafeN Int    
-  deriving newtype (Index, Show)    
-    
-type ViewN :: Nat -> Type    
-type role ViewN nominal    
-data ViewN n where    
-  ViewNZ :: ViewN Z    
-  ViewNS :: N n -> ViewN (S n)    
-    
-viewNat :: N n -> ViewN n    
-viewNat (UnsafeN 0) = unsafeCoerce ViewNZ    
-viewNat (UnsafeN n) = unsafeCoerce (ViewNS $ UnsafeN (n-1))    
-    
-pattern NZ :: () => (n ~ Z) => N n    
-pattern NZ <- (viewNat -> ViewNZ) where    
-  NZ = UnsafeN 0    
-    
-pattern NS :: () => (n ~ S n') => N n' -> N n    
-pattern NS n <- (viewNat -> ViewNS n) where    
-  NS n = UnsafeN (index n + 1)    
+type Z = 0
+type S n = 1 + n
+
+wk :: forall i r proxy. proxy i -> (i <= S i => r) -> r
+wk _ r = case unsafeCoerce Refl of
+  (Refl :: (i <=? S i) :~: 'True) -> r
+
+type N :: Nat -> Type
+type role N nominal
+newtype N i = UnsafeN Int
+  deriving newtype (ToInt, Show)
+
+type ViewN :: Nat -> Type
+type role ViewN nominal
+data ViewN n where
+  ViewNZ :: ViewN Z
+  ViewNS :: N n -> ViewN (S n)
+
+viewNat :: N n -> ViewN n
+viewNat (UnsafeN 0) = unsafeCoerce ViewNZ
+viewNat (UnsafeN n) = unsafeCoerce (ViewNS $ UnsafeN (n-1))
+
+pattern NZ :: () => (n ~ Z) => N n
+pattern NZ <- (viewNat -> ViewNZ) where
+  NZ = UnsafeN 0
+
+pattern NS :: () => (n ~ S n') => N n' -> N n
+pattern NS n <- (viewNat -> ViewNS n) where
+  NS n = UnsafeN (int n + 1)
 
 {-# complete NZ, NS #-}
-    
--------------------------------------------------------------------------------    
--- * Fin n    
--------------------------------------------------------------------------------    
-    
-type ViewFin :: Nat -> Type    
+
+-------------------------------------------------------------------------------
+-- * Fin n
+-------------------------------------------------------------------------------
+
+type ViewFin :: Nat -> Type
 type role ViewFin nominal
 data ViewFin j where
   ViewZ :: ViewFin (S j)
@@ -76,10 +76,10 @@ data ViewFin j where
 type Fin :: Nat -> Type
 type role Fin nominal
 newtype Fin j = UnsafeFin Int
-instance Index (Fin j) where index (UnsafeFin n) = n
+instance ToInt (Fin j) where int (UnsafeFin n) = n
 
 instance Show (Fin j) where
-  showsPrec d = showsPrec d . index
+  showsPrec d = showsPrec d . int
 
 viewFin :: Fin i -> ViewFin i
 viewFin (UnsafeFin 0) = unsafeCoerce ViewZ
@@ -91,6 +91,6 @@ pattern Z <- (viewFin -> ViewZ) where
 
 pattern S :: () => (j ~ S i) => Fin i -> Fin j
 pattern S n <- (viewFin -> ViewS n) where
-  S n = UnsafeFin (index n + 1)
+  S n = UnsafeFin (int n + 1)
 
 {-# complete Z, S #-}

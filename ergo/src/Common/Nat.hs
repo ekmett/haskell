@@ -1,7 +1,7 @@
 {-# Language ExplicitNamespaces #-}
 
-module Common.Nat 
-  ( Index(..)
+module Common.Nat
+  ( ToInt(..)
   , type Z
   , type S
   , wk

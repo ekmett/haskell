@@ -82,14 +82,14 @@ infixr 5 :*
 lookupSkew :: Skew i a -> Fin i -> a
 lookupSkew Nil _ = error "impossible name"
 lookupSkew (ConsTree n0 t xs) !m0
-  | n0 <= index m0 = lookupSkew xs (UnsafeFin (index m0 - n0))
+  | n0 <= int m0 = lookupSkew xs (UnsafeFin (int m0 - n0))
   | otherwise = go n0 t m0
   where
     go :: Int -> Tree j k a -> Fin j -> a
     go _ (TTip a) _ = a
     go n (TBin a l r) m
       | n == 0 = a
-      | index m <= n' = go n' l $ UnsafeFin (index m - 1)
-      | otherwise     = go n' r $ UnsafeFin (index m - n' - 1)
+      | int m <= n' = go n' l $ UnsafeFin (int m - 1)
+      | otherwise     = go n' r $ UnsafeFin (int m - n' - 1)
       where n' = unsafeShiftR n 1
 

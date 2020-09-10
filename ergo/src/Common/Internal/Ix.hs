@@ -22,14 +22,14 @@ type Ix = Fin
 type Lvl :: Nat -> Type
 type role Lvl nominal
 newtype Lvl i = UnsafeLvl Int 
-  deriving newtype (Show,Index)
+  deriving newtype (Show,ToInt)
 
 topLvl :: N i -> Lvl (S n)
 topLvl = coerce
 
 lvlIx :: N i -> Lvl i -> Ix i
-lvlIx n l = UnsafeFin (index n - index l - 1)
+lvlIx n l = UnsafeFin (int n - int l - 1)
 
 ixLvl :: N i -> Ix i -> Lvl i
-ixLvl n i = UnsafeLvl (index n - index i - 1)
+ixLvl n i = UnsafeLvl (int n - int i - 1)
 
