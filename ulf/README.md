@@ -1,4 +1,4 @@
-lf
+ulf
 ==
 
 A toy (eventually) quantitative logical framework

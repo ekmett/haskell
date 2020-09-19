@@ -4,7 +4,7 @@ module Common.Nat
   ( ToInt(..)
   , type Z
   , type S
-  , wk
+  , wk, wk2
   , N(NZ,NS)
   , Fin(Z,S)
   ) where

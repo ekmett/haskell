@@ -2,3 +2,9 @@ old
 dist-newstyle
 .ghc*
 tags
+*.hi
+*.o
+.DS_Store
+broken
+scratch
+wip

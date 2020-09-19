@@ -8,7 +8,7 @@ watch:
 	@ghcid
 
 uninstall: 
-	@rm -rf ../dist-newstyle/build/*/*/ergo-0/
+	@rm -rf ../dist-newstyle/build/*/*/ulf-0/
 
 over: uninstall build
 

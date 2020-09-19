@@ -12,6 +12,7 @@ module Common.Internal.Skew
   , ViewSkew(..)
   , viewSkew
   , lookupSkew
+  , sizeSkew
   ) where
 
 import Common.Internal.Nat
@@ -40,20 +41,24 @@ instance Traversable (Tree j k) where
 type Skew :: Nat -> Type -> Type
 type role Skew nominal representational
 data Skew i a where
-  ConsTree :: {-# unpack #-} !Int -> !(Tree i j a) -> !(Skew j a) -> Skew i a
+  ConsTree :: {-# unpack #-} !Int -> {-# unpack #-} !Int -> !(Tree i j a) -> !(Skew j a) -> Skew i a
   Nil  :: Skew Z a
 
 instance Functor (Skew i) where
   fmap _ Nil = Nil
-  fmap f (ConsTree i t xs) = ConsTree i (fmap f t) (fmap f xs)
+  fmap f (ConsTree n i t xs) = ConsTree n i (fmap f t) (fmap f xs)
 
 instance Foldable (Skew i) where
   foldMap _ Nil = mempty
-  foldMap f (ConsTree _ t xs) = foldMap f t <> foldMap f xs
+  foldMap f (ConsTree _ _ t xs) = foldMap f t <> foldMap f xs
+  length Nil = 0
+  length (ConsTree n _ _ _) = n
+  null Nil = True
+  null _ = False
 
 instance Traversable (Skew i) where
   traverse _ Nil = pure Nil
-  traverse f (ConsTree i t xs) = ConsTree i <$> traverse f t <*> traverse f xs
+  traverse f (ConsTree n i t xs) = ConsTree n i <$> traverse f t <*> traverse f xs
 
 type ViewSkew :: Nat -> Type -> Type
 type role ViewSkew nominal representational
@@ -62,14 +67,14 @@ data ViewSkew i a where
   ViewCons :: a -> Skew i a -> ViewSkew (S i) a
 
 skewCons :: a -> Skew i a -> Skew (S i) a
-skewCons a (ConsTree n l (ConsTree m r xs))
-  | n == m = ConsTree (2*n+1) (TBin a l r) xs
-skewCons a xs = ConsTree 1 (TTip a) xs
+skewCons a (ConsTree s n l (ConsTree _ m r xs))
+  | n == m = ConsTree (1+s) (2*n+1) (TBin a l r) xs
+skewCons a xs = ConsTree (1+length xs) 1 (TTip a) xs
 
 viewSkew :: Skew i a -> ViewSkew i a
 viewSkew Nil = ViewNil
-viewSkew (ConsTree _ (TTip a) xs)     = ViewCons a xs
-viewSkew (ConsTree n (TBin a l r) xs) = ViewCons a $ ConsTree n' l $ ConsTree n' r xs
+viewSkew (ConsTree _ _ (TTip a) xs)     = ViewCons a xs
+viewSkew (ConsTree s n (TBin a l r) xs) = ViewCons a $ ConsTree (s-1) n' l $ ConsTree (s-1-n') n' r xs
   where n' = unsafeShiftR n 1
 
 pattern (:*) :: () => (l ~ S k) => a -> Skew k a -> Skew l a
@@ -81,7 +86,7 @@ infixr 5 :*
 
 lookupSkew :: Skew i a -> Fin i -> a
 lookupSkew Nil _ = error "impossible name"
-lookupSkew (ConsTree n0 t xs) !m0
+lookupSkew (ConsTree _ n0 t xs) !m0
   | n0 <= int m0 = lookupSkew xs (UnsafeFin (int m0 - n0))
   | otherwise = go n0 t m0
   where
@@ -93,3 +98,6 @@ lookupSkew (ConsTree n0 t xs) !m0
       | otherwise     = go n' r $ UnsafeFin (int m - n' - 1)
       where n' = unsafeShiftR n 1
 
+
+sizeSkew :: Skew i a -> N i
+sizeSkew = UnsafeN . length 

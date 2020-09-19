@@ -1,6 +1,8 @@
 {-# Language ScopedTypeVariables #-}
 {-# Language PatternSynonyms #-}
 {-# Language DerivingStrategies #-}
+{-# Language AllowAmbiguousTypes #-}
+{-# Language PolyKinds #-}
 {-# Language DataKinds #-}
 {-# Language TypeOperators #-}
 {-# Language StandaloneKindSignatures #-}
@@ -15,6 +17,7 @@ module Common.Internal.Nat
   , type Z
   , type S
   , wk
+  , wk2
   , N(UnsafeN,NZ,NS)
   , ViewN(..)
   , Fin(UnsafeFin,Z,S)
@@ -37,6 +40,10 @@ type S n = 1 + n
 wk :: forall i r proxy. proxy i -> (i <= S i => r) -> r
 wk _ r = case unsafeCoerce Refl of
   (Refl :: (i <=? S i) :~: 'True) -> r
+
+wk2 :: forall j i r p q. j <= i => p i -> q j -> (j <= S i => r) -> r
+wk2 _ _ r = case unsafeCoerce Refl of
+  (Refl :: (j <=? S i) :~: 'True) -> r
 
 type N :: Nat -> Type
 type role N nominal
@@ -71,7 +78,7 @@ type ViewFin :: Nat -> Type
 type role ViewFin nominal
 data ViewFin j where
   ViewZ :: ViewFin (S j)
-  ViewS :: Fin j -> ViewFin (S j)
+  ViewS :: Fin j -> ViewFin (S j) -- Fin (S j) -> ViewFin (S (S j)) ?
 
 type Fin :: Nat -> Type
 type role Fin nominal
