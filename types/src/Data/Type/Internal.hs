@@ -1,35 +1,42 @@
 {-# language CPP #-}
-{-# language RankNTypes #-}
-{-# language PolyKinds #-}
-{-# language DataKinds #-}
-{-# language PatternSynonyms #-}
-{-# language DerivingStrategies #-}
-{-# language GeneralizedNewtypeDeriving #-}
-{-# language ViewPatterns #-}
-{-# language RoleAnnotations #-}
-{-# language StandaloneKindSignatures #-}
-{-# language ConstraintKinds #-}
-{-# language QuantifiedConstraints #-}
-{-# language LambdaCase #-}
-{-# language EmptyCase #-}
-{-# language NPlusKPatterns #-}
-{-# language TypeFamilies #-}
-{-# language UndecidableInstances #-}
-{-# language TypeOperators #-}
-{-# language GADTs #-}
-{-# language FlexibleInstances #-}
-{-# language FlexibleContexts #-}
-{-# language TypeApplications #-}
+{-# Language BlockArguments #-}
+{-# Language ImportQualifiedPost #-}
+{-# Language LambdaCase #-}
+{-# Language ViewPatterns #-}
 {-# language AllowAmbiguousTypes #-}
-{-# language ScopedTypeVariables #-}
-{-# language TemplateHaskell #-}
+{-# language ConstraintKinds #-}
+{-# language DataKinds #-}
+{-# language DerivingStrategies #-}
+{-# language EmptyCase #-}
+{-# language FlexibleInstances #-}
+{-# language GADTs #-}
+{-# language GeneralizedNewtypeDeriving #-}
+{-# language LambdaCase #-}
 {-# language MagicHash #-}
+{-# language PatternSynonyms #-}
+{-# language PolyKinds #-}
+{-# language QuantifiedConstraints #-}
+{-# language RankNTypes #-}
+{-# language RoleAnnotations #-}
+{-# language ScopedTypeVariables #-}
+{-# language StandaloneKindSignatures #-}
+{-# language TypeApplications #-}
+{-# language TypeFamilies #-}
+{-# language TypeOperators #-}
+{-# language ViewPatterns #-}
+{-# language Unsafe #-}
+{-# OPTIONS_GHC -Wno-unused-binds #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_HADDOCK not-home #-}
+-- {-# OPTIONS_GHC -Wno-unused-imports #-}
 
 -- this makes the core well typed, but gets in the way of using ghci
 -- that said, -fobject-code usually fixes that
 --
 -- #define USE_MAGICDICT 
+
+-- Note: this module does not have all the instances, Data.Type generates many of those using TH
+-- so be careful of writing orphans if you just depend on this module.
 
 module Data.Type.Internal where
 
@@ -41,20 +48,12 @@ import Data.Some
 import Data.Type.Equality
 import Data.Void
 import GHC.Exts
-import GHC.Types
-import GHC.TypeNats as TN
 import GHC.TypeLits as TL
+import GHC.TypeNats as TN
 import Numeric.Natural
 import Text.Read hiding (Symbol)
 import Type.Reflection
 import Unsafe.Coerce
-
-type Z :: Nat
-type Z = 0
-
--- | successor of a natural number
-type S :: Nat -> Nat
-type S n = 1+n
 
 --------------------------------------------------------------------------------
 -- * Singletons
@@ -244,6 +243,13 @@ pattern S n <- (safePred . fromNat -> Just (Nat -> n)) where
 
 {-# complete Z, S #-}
 
+type Z :: Nat
+type Z = 0
+
+-- | successor of a natural number
+type S :: Nat -> Nat
+type S n = 1+n
+
 type SNat' :: Nat -> Type
 data SNat' n where
   SZ' :: SNat' Z
@@ -397,12 +403,13 @@ instance SingI '[] where
 instance (SingI a, SingI as) => SingI (a ': as) where
   sing = UnsafeSing (reflect @_ @a : reflect @_ @as)
 
--- {-# complete SNil, SCons #-}
+{-# complete SNil, SCons #-}
 
 --------------------------------------------------------------------------------
 -- * Lifting Maybe
 --------------------------------------------------------------------------------
 
+{-
 type SMaybe' :: forall a. Maybe a -> Type
 type role SMaybe' nominal
 data SMaybe' a where
@@ -422,6 +429,11 @@ pattern SJust a <- (upSMaybe -> SJust' a) where
   SJust (Sing a) = UnsafeSing (Just a)
 
 {-# complete SNothing, SJust #-}
+
+instance SingI a => SingI ('Just a) where sing = SJust sing
+
+instance SingI 'Nothing where sing = SNothing
+-}
 
 --------------------------------------------------------------------------------
 -- * Lifting Products
@@ -448,9 +460,7 @@ pattern SPair a b <- Sing (UnsafeSing -> a, UnsafeSing -> b) where
 -- * Lifting Booleans
 --------------------------------------------------------------------------------
 
-instance SingI 'True where sing = STrue
-instance SingI 'False where sing = SFalse
-
+{-
 type SBool' :: Bool -> Type
 type role SBool' nominal
 data SBool' b where
@@ -471,14 +481,15 @@ pattern SFalse <- (upSBool -> SFalse') where
 
 {-# complete STrue, SFalse #-}
 
+instance SingI 'True where sing = STrue
+instance SingI 'False where sing = SFalse
+-}
+
 --------------------------------------------------------------------------------
 -- * Lifting Ordering
 --------------------------------------------------------------------------------
 
-instance SingI 'LT where sing = SLT
-instance SingI 'EQ where sing = SEQ
-instance SingI 'GT where sing = SGT
-
+{-
 type SOrdering' :: Ordering -> Type
 type role SOrdering' nominal
 data SOrdering' t where
@@ -505,6 +516,11 @@ pattern SGT <- (upSOrdering -> SGT') where
 
 {-# complete SLT, SEQ, SGT #-}
 
+instance SingI 'LT where sing = SLT
+instance SingI 'EQ where sing = SEQ
+instance SingI 'GT where sing = SGT
+-}
+
 --------------------------------------------------------------------------------
 -- * Lifting Either
 --------------------------------------------------------------------------------
@@ -520,9 +536,6 @@ upSEither :: Sing a -> SEither' a
 upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (UnsafeSing a))
 upSEither (Sing (Right b)) = unsafeCoerce (SRight' (UnsafeSing b))
 
-instance SingI a => SingI ('Left a) where sing = SLeft sing
-instance SingI b => SingI ('Right b) where sing = SRight sing
-
 pattern SLeft :: () => (ma ~ 'Left a) => Sing a -> Sing ma
 pattern SLeft a <- (upSEither -> SLeft' a) where
   SLeft (Sing a) = UnsafeSing (Left a)
@@ -532,4 +545,7 @@ pattern SRight a <- (upSEither -> SRight' a) where
   SRight (Sing a) = UnsafeSing (Right a)
 
 {-# complete SLeft, SRight #-}
+
+instance SingI a => SingI ('Left a) where sing = SLeft sing
+instance SingI b => SingI ('Right b) where sing = SRight sing
 -}

@@ -30,6 +30,12 @@ extra-doc-files:
   README.md,
   CHANGELOG.md
 
+flag dump
+  default: False
+  manual: True
+  description:
+    Dump splices
+
 flag magicDict
   default: False
   manual: True
@@ -62,8 +68,13 @@ library
   import: base
   build-depends: some
   hs-source-dirs: src
+  if flag(dump)
+    ghc-options: -ddump-splices
+  if flag(magicDict)
+    cpp-options: -DUSE_MAGICDICT
   exposed-modules: 
     Data.Type
-    Data.Type.Internal
+    Data.Type.Unsafe
     Data.Type.TH
-  
+  other-modules:
+    Data.Type.Internal

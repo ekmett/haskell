@@ -5,11 +5,15 @@
 {-# Language BlockArguments #-}
 {-# Language ParallelListComp #-}
 {-# Language ImportQualifiedPost #-}
+{-# Language Unsafe #-}
 {-# OPTIONS_GHC -Wno-unused-binds #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
-module Data.Type.TH
-  ( makeSing
+module Data.Type.TH 
+  ( SingRules(..)
+  , makeSing
+  , makeSingWith
+  , defaultSingRules
   ) where
 
 import Control.Monad (unless)
@@ -31,8 +35,8 @@ data SingRules = SingRules
   , singUp       :: Name -> Name
   }
 
-defaultRules :: SingRules
-defaultRules = SingRules{..} where
+defaultSingRules :: SingRules
+defaultSingRules = SingRules{..} where
   singTyCon    =  mkName . (++"'") . ('S':) . nameBase
   singDataCon  =  mkName  . ('S':) . nameBase
   singDataCon' =  mkName . (++"'") . ('S':) . nameBase
@@ -49,7 +53,7 @@ makeSingWith opts n = TH.reify n >>= \case
   _ -> fail "mkSing: unsupported type"
 
 makeSing :: Name -> Q [Dec]
-makeSing = makeSingWith defaultRules
+makeSing = makeSingWith defaultSingRules
 
 csingi :: Q Type
 csingi = conT ''SingI
@@ -110,7 +114,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     , pure <$> makeData
     , makeUp
     , concat <$> traverse makePattern cons
-    -- , traverse makeSingI cons
+    , traverse makeSingI cons
     -- , makeComplete
     ] where
     sname = singTyCon name
@@ -162,7 +166,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
 
     makeSingI' :: Name -> [Type] -> Q Dec
     makeSingI' n tys = instanceD cxt' typeQ
-      [ valD (varP 'sing) (normalB $ foldl (\l _ -> appE l (varE 'sing)) (conE $ singTyCon n) tys) []
+      [ valD (varP 'sing) (normalB $ foldl (\l _ -> appE l (varE 'sing)) (conE $ singDataCon n) tys) []
       ] where
       qtys = pure <$> tys
       cxt' = for qtys $ appT (conT ''SingI)
@@ -240,4 +244,3 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     -- {-# complete SLeft, SRight #-}
     makeComplete :: Q [Dec]
     makeComplete = pure []
-
