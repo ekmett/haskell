@@ -23,8 +23,6 @@ module Data.Type
     ( Sing
     , fromSing
     )
-  -- * Structural Equality
-  , SEq
   -- * Reifying terms and constraints into singletons
   , SingI(..)
   , Reifies, ify , reify

@@ -38,12 +38,12 @@
 module Data.Type.Internal where
 
 import Control.Exception
+import Data.Eq.Structural
 import Data.Function
 import Data.Kind
 import Data.Proxy
 import Data.Some
 import Data.Type.Equality
-import Data.Void
 import GHC.Exts
 import GHC.TypeLits as TL
 import GHC.TypeNats as TN
@@ -73,18 +73,6 @@ instance Eq (Sing a) where
 
 instance Ord (Sing a) where
   compare _ _ = EQ
-
--- structural equality -- x = y => f x = f y 
--- class (Deciding SEq a, Eq a) => SEq a
-class Eq a => SEq a
-instance SEq Int
-instance SEq Char
-instance SEq Void
-instance SEq ()
-instance (SEq a, SEq b) => SEq (a, b)
-instance (SEq a, SEq b) => SEq (Either a b)
-instance SEq a => SEq [a]
-instance SEq a => SEq (Maybe a)
 
 -- assumes equality is structural.
 instance SEq k => TestEquality (Sing :: k -> Type) where

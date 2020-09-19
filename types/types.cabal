@@ -73,6 +73,7 @@ library
   if flag(magicDict)
     cpp-options: -DUSE_MAGICDICT
   exposed-modules: 
+    Data.Eq.Structural
     Data.Type
     Data.Type.Unsafe
     Data.Type.TH
