@@ -25,18 +25,15 @@
 {-# language TypeOperators #-}
 {-# language ViewPatterns #-}
 {-# language Unsafe #-}
-{-# OPTIONS_GHC -Wno-unused-binds #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_HADDOCK not-home #-}
--- {-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
--- this makes the core well typed, but gets in the way of using ghci
--- that said, -fobject-code usually fixes that
---
--- #define USE_MAGICDICT 
-
--- Note: this module does not have all the instances, Data.Type generates many of those using TH
--- so be careful of writing orphans if you just depend on this module.
+-- |
+-- Copyright :  (c) Edward Kmett 2020
+-- License   :  BSD-2-Clause OR Apache-2.0
+-- Maintainer:  Edward Kmett <ekmett@gmail.com>
+-- Stability :  experimental
+-- Portability: non-portable
 
 module Data.Type.Internal where
 

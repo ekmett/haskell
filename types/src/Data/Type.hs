@@ -9,27 +9,32 @@
 {-# language GADTs #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
+-- |
+-- Copyright :  (c) Edward Kmett 2020
+-- License   :  BSD-2-Clause OR Apache-2.0
+-- Maintainer:  Edward Kmett <ekmett@gmail.com>
+-- Stability :  experimental
+-- Portability: non-portable
+
 module Data.Type
-  ( Sing
+  ( 
+  -- * Singleton types and reflection from singletons
+    Sing
     ( Sing
     , fromSing
-    , SS, SZ -- Nat
-    , SType -- Type
-    , SIntS, SIntZ, SMkInt -- Int
-    , SLeft, SRight -- Either
-    , SJust, SNothing -- Maybe
-    , SNil, SCons -- List
-    , STrue, SFalse -- Bool
-    , SLT, SEQ, SGT -- Ordering
-    , SPair -- (,)
     )
+  -- * Structural Equality
   , SEq
+  -- * Reifying terms and constraints into singletons
   , SingI(..)
-  , Reifies, ify , reify, reflect
-  -- lowering types
+  , Reifies, ify , reify
+  -- * Reflecting back down from types
+  , reflect
+  -- * Types
   , type Type
   , pattern Type
-  -- lowering nats
+  , pattern SType
+  -- * Nats
   , Nat
   , toNat, fromNat
   , pattern Nat
@@ -37,20 +42,34 @@ module Data.Type
   , pattern S
   , type Z
   , type S
-  -- lowering symbols
+  , pattern SS
+  , pattern SZ
+  -- * Symbol
   , Symbol
   , pattern Symbol
   , toSymbol
   , fromSymbol
-  -- lifting ints
+  -- * Int
   , MkInt
-  -- lifting chars
+  , pattern SIntS, pattern SIntZ, pattern SMkInt -- Int
+  -- * Char
   , MkChar
+  -- * (,)
+  , pattern SPair -- (,)
+  -- * Either
+  , pattern SLeft, pattern SRight -- Either
+  -- * Maybe
+  , pattern SJust, pattern SNothing -- Maybe
+  -- * List
+  , pattern SNil, pattern SCons -- List
+  -- * Bool
+  , pattern STrue, pattern SFalse -- Bool
+  -- * Ordering
+  , pattern SLT, pattern SEQ, pattern SGT -- Ordering
   ) where
 
 import Data.Type.Internal
-  hiding (safePred) 
-import Data.Type.TH
+import Data.Type.Internal.TH
 import Data.Kind (Type)
 import GHC.TypeLits (Nat, Symbol)
 

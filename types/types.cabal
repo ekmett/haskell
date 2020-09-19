@@ -78,3 +78,4 @@ library
     Data.Type.TH
   other-modules:
     Data.Type.Internal
+    Data.Type.Internal.TH
