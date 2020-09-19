@@ -509,6 +509,7 @@ pattern SGT <- (upSOrdering -> SGT') where
 -- * Lifting Either
 --------------------------------------------------------------------------------
 
+{-
 type SEither' :: forall a b. Either a b -> Type
 type role SEither' nominal
 data SEither' t where
@@ -531,3 +532,4 @@ pattern SRight a <- (upSEither -> SRight' a) where
   SRight (Sing a) = UnsafeSing (Right a)
 
 {-# complete SLeft, SRight #-}
+-}

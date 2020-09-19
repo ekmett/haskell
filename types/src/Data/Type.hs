@@ -36,8 +36,8 @@ module Data.Type
     , SGT
 
     -- singleton sums
-    , SLeft
-    , SRight
+   -- , SLeft
+   -- , SRight
     )
   , SEq
   , SingI(sing)
