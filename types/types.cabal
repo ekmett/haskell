@@ -1,0 +1,67 @@
+cabal-version: 3.4
+name: types
+version: 0
+synopsis: Fast singletons and nicer kinds
+description: 
+  This package provides quick promotion of terms to @singletons@ with
+  much less boilerplate for casual use. The round trip conversion to/from 
+  types is /O(1)/ unlike the conversion offered by the @singletons@ package, 
+  which has to walk the entire term, leading to an /O(n)/ trip cost. To 
+  achieve this a uniform representation for all singletons is used.
+  .
+  This allows us to produce singleton types for a larger range of types,
+  including types like 'Int' and 'Char'.
+  .
+  However, this also exposes a need to "lower" certain previously uninhabited 
+  kinds to the type level, in a way that they can have terms in them.
+  So we make the built-in kinds for 'Nat', 'Symbol', and 'Type' behave like
+  other types, with meaningful values in them when lowered to the type level.
+
+homepage: https://github.com/ekmett/haskell
+license: BSD-2-Clause OR Apache-2.0
+license-file: LICENSE.md
+author: Edward Kmett
+maintainer: Edward Kmett <ekmett@gmail.com>
+copyright: Copyright (c) 2020 Edward Kmett
+stability: experimental
+category: Data Structures
+build-type: Simple
+extra-doc-files:
+  README.md,
+  CHANGELOG.md
+
+flag magicDict
+  default: False
+  manual: True
+  description: 
+    Use 'magicDict' rather than 'unsafeCoerce' for the construction of dictionaries.
+    This yields properly typed core, at the expense that you the module needs to be
+    actually compiled, as the 'magicDict' rule won't fire from a REPL without 
+    @-fobject-code@. By default this is off, to match the behavior of the 
+    @reflection@ library. The only user visible change is that the internal 'With' 
+    type becomes a @data@ type rather than a @newtype@ when this is enabled.
+
+source-repository head
+  type: git
+  location: https://github.com/ekmett/haskell
+  subdir: types
+
+common base
+  default-language: Haskell2010
+  build-depends:
+    base >= 4.14 && < 5,
+    ghc-prim
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
+    -Wredundant-constraints -Widentities
+    -Wno-simplifiable-class-constraints
+
+library
+  import: base
+  build-depends: some
+  hs-source-dirs: src
+  exposed-modules: 
+    Data.Type
+    Data.Type.Internal
+  --  Data.Type.TH
+  
