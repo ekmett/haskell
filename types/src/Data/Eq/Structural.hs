@@ -6,7 +6,7 @@ module Data.Eq.Structural
   ) where
 
 import Control.Applicative
-import Control.Concurrent.MVar
+import Control.Concurrent
 import Data.IORef
 import Data.List.NonEmpty
 import Data.Proxy
@@ -17,13 +17,17 @@ import Foreign.StablePtr
 import GHC.Prim
 import GHC.Types
 
--- structural equality
--- x = y ==> f x = f y
+-- | A type with structural equality
+--
+-- @
+-- x '==' y ==> f x '==' f y
+-- @
 class Eq a => SEq a
 instance SEq (MVar a)
 instance SEq (IORef a)
 instance SEq (STRef s a)
 instance SEq (Proxy a)
+instance SEq ThreadId
 instance SEq a => SEq (Const a b)
 instance SEq Bool
 instance SEq ()

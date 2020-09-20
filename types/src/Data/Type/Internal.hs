@@ -422,13 +422,13 @@ pattern SCons :: () => aas ~ (a ': as) => Sing a -> Sing as -> Sing aas
 pattern SCons a as <- (upSList -> SCons' a as) where
   SCons (Sing a) (Sing as) = UnsafeSing (a:as)
 
+{-# complete SNil, SCons #-}
+
 instance SingI '[] where
-  sing = UnsafeSing []
+  sing = SNil
 
 instance (SingI a, SingI as) => SingI (a ': as) where
-  sing = UnsafeSing (reflect @_ @a : reflect @_ @as)
-
-{-# complete SNil, SCons #-}
+  sing = SCons sing sing
 
 --------------------------------------------------------------------------------
 -- * Singleton Products
@@ -442,11 +442,12 @@ data SPair' t where
 upSPair :: Sing a -> SPair' a
 upSPair (Sing (a,b)) = unsafeCoerce $ SPair' (UnsafeSing a) (UnsafeSing b)
 
-instance (SingI a, SingI b) => SingI '(a, b) where
-  sing = UnsafeSing (reflect @_ @a,reflect @_ @b)
-
 pattern SPair :: Sing a -> Sing b -> Sing '(a, b)
 pattern SPair a b <- Sing (UnsafeSing -> a, UnsafeSing -> b) where
   SPair a b = UnsafeSing (fromSing a, fromSing b)
 
 {-# complete SPair #-}
+
+instance (SingI a, SingI b) => SingI '(a, b) where
+  sing = SPair sing sing
+

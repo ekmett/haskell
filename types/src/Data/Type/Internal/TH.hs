@@ -6,7 +6,7 @@
 {-# Language ParallelListComp #-}
 {-# Language ImportQualifiedPost #-}
 {-# Language Unsafe #-}
-{-# OPTIONS_GHC -Wno-unused-binds #-}
+-- {-# OPTIONS_GHC -Wno-unused-binds #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -54,7 +54,7 @@ makeSingWith opts n = TH.reify n >>= \case
     DataD    [] name tyvars mkind cons _ -> makeSing' opts name tyvars mkind cons
     NewtypeD [] name tyvars mkind con _ -> makeSing' opts name tyvars mkind [con]
     _ -> fail "makeSing: can only handle data and newtype declarations"
-  _ -> fail "mkSing: unsupported type"
+  d -> fail $ "makeSing: unsupported type\n\n" ++ pprint d
 
 makeSing :: Name -> Q [Dec]
 makeSing = makeSingWith defaultSingRules
@@ -119,7 +119,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     , makeUp
     , concat <$> traverse makePattern cons
     , pure <$> makeComplete
-    -- , traverse makeSingI cons
+    , concat <$> traverse makeSingI cons
     ] where
     sname = singTyCon name
 
@@ -143,25 +143,32 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     --   SLeft'  :: Sing a -> SEither' ('Left a)
     --   SRight' :: Sing b -> SEither' ('Right b)
     makeData :: Q Dec
-    makeData = dataD (pure []) sname [plainTV (mkName "n")] Nothing scons [] where
-      scons = cons <&> \case
-        NormalC cname cbtys -> makeData' cname $ fst <$> cbtys
-        RecC cname cvbtys -> makeData' cname $ cvbtys <&> \(_,b,_) -> b
-        _ -> fail "makeSing: unsupported data constructor type"
+    makeData = dataD (pure []) sname [plainTV (mkName "n")] Nothing (cons >>= go) [] where
+      go = \case
+        NormalC cname cbtys -> pure $ makeDataCon cname $ fst <$> cbtys
+        RecC cname cvbtys -> pure $ makeDataCon cname $ cvbtys <&> \(_,b,_) -> b
+        GadtC cnames cbtys _ -> cnames <&> \cname -> makeDataCon cname $ fst <$> cbtys
+        RecGadtC cnames cvbtys _ -> cnames <&> \cname -> makeDataCon cname $ cvbtys <&> \(_,b,_) -> b
+        ForallC _ _ con -> go con
+        InfixC (b,_) cname (b',_) -> pure $ makeDataCon cname [b,b']
+        -- d -> fail $ "makeSing: unsupported data constructor type\n\n" ++ pprint d
 
-    makeData' :: Name -> [Bang] -> Q Con
-    makeData' cname bangs = do
+    makeDataCon :: Name -> [Bang] -> Q Con
+    makeDataCon cname bangs = do
       bns <- for (zipWith (,) bangs (cycle ['a'..'z'])) \case
         (b,c) -> (,) b <$> (newName (pure c) >>= varT)
       gadtC [singDataCon' cname] (traverse (appT csing . pure) <$> bns) $
         conT sname `appT` foldl (\l (_,n) -> appT l (pure n)) (promotedT cname) bns
 
+    thd (_,_,x) = x
+
+    -- this seems misimplemented
     -- instance SingI a => SingI ('Left a) where sing = SLeft sing
-    makeSingI :: Con -> Q Dec
+    makeSingI :: Con -> Q [Dec]
     makeSingI = \case
-        NormalC n btys -> makeSingI' n (snd <$> btys)
-        RecC n vbtys   -> makeSingI' n $ vbtys <&> \(_,_,x) -> x
-        _ -> fail "makeSing: unsupported data constructor type"
+        NormalC n ts -> pure <$> makeSingI' n (snd <$> ts)
+        RecC n ts    -> pure <$> makeSingI' n (thd <$> ts)
+        d -> fail $ "makeSing.makeSingI: unsupported data constructor type\n\n" ++ pprint d
 
     makeSingI' :: Name -> [Type] -> Q Dec
     makeSingI' n tys = instanceD cxt' typeQ
@@ -171,64 +178,70 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
       cxt' = for qtys $ appT (conT ''SingI)
       typeQ = appT csingi $ foldl appT (promotedT n) qtys
 
+{-
     conName :: Con -> Name
     conName (NormalC n _) = n
     conName (RecC n _) = n
     conName (InfixC _ n _) = n
     conName _ = error "unsupported constructor type"
+-}
 
-    fresh :: [a] -> Q [Name]
-    fresh tys = sequence [ newName [c] | c <- cycle ['a'..'z'] | _ <- tys ]
+    fresh :: Int -> Q [Name]
+    fresh n = traverse (newName . pure) $ take n $ cycle ['a'..'z']
 
+    -- upSEither :: Sing a -> SEither' a
+    -- upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (UnsafeSing a))
+    -- upSEither (Sing (Right b)) = unsafeCoerce (SRight' (UnsafeSing b))
     makeUp :: Q [Dec]
     makeUp = sequence $
-        -- upSEither :: Sing a -> SEither' a
       [ sigD (singUp name) $ appT csing (varT (mkName "a")) `arrT` appT (conT sname) (varT (mkName "a"))
-        -- upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (UnsafeSing a))
-        -- upSEither (Sing (Right b)) = unsafeCoerce (SRight' (UnsafeSing b))
-
-      , funD (singUp name) clauses
+      , funD (singUp name) (cons >>= go)
       ] where
-      clauses = cons <&> \case
-        NormalC n btys -> do
-          args <- fresh btys
-          clause
-            [conP 'Sing [conP n (varP <$> args)]]
-            do normalB $ varE 'unsafeCoerce `appE`
-                 foldl (\l r -> l `appE` (conE 'UnsafeSing `appE` varE r)) (conE (singDataCon' n)) args
-            []
-        RecC n vbtys -> do
-          args <- fresh vbtys
-          clause
-            [conP 'Sing [conP n (varP <$> args)]]
-            do normalB $ varE 'unsafeCoerce `appE`
-                 foldl (\l r -> l `appE` (conE 'UnsafeSing `appE` varE r)) (conE (singDataCon' n)) args
-            []
-        _ -> fail "makeSing.makeUp: unsupported data constructor type"
+      go = \case
+        NormalC n (length -> d) -> [makeUpClause d n]
+        RecC n (length -> d) -> [makeUpClause d n]
+        GadtC ns (length -> d) _ -> makeUpClause d <$> ns
+        RecGadtC ns (length -> d) _ -> makeUpClause d <$> ns
+        ForallC _ _ con -> go con
+        InfixC _ n _ -> [makeUpClause 2 n]
+        -- d -> fail $ "makeSing.makeUp: unsupported data constructor type\n\n" ++ pprint d
+
+    makeUpClause :: Int -> Name -> Q Clause
+    makeUpClause d n = do
+      args <- fresh d
+      clause
+        [conP 'Sing [conP n (varP <$> args)]]
+        do normalB $ varE 'unsafeCoerce `appE`
+             foldl (\l r -> l `appE` (conE 'UnsafeSing `appE` varE r)) (conE (singDataCon' n)) args
+        []
+
+    eqT :: Q Type -> Q Type -> Q Type
+    eqT x y = equalityT `appT` x `appT` y
 
     -- we can't mimic the original record type, because they could have multiple field accessors of
     -- the same name, and record pattern synonyms can't share names
     makePattern :: Con -> Q [Dec]
     makePattern = \case
-      NormalC cname btys -> makePattern' cname (snd <$> btys)
-      RecC cname vbtys -> makePattern' cname (vbtys <&> \(_,_,x) -> x)
-      _ -> fail "makeSing.makePattern: unsupported data constructor type"
-
-    eqT :: Q Type -> Q Type -> Q Type
-    eqT x y = equalityT `appT` x `appT` y
+      NormalC n (length -> d) -> makePattern' d n
+      RecC n (length -> d) -> makePattern' d n
+      GadtC ns (length -> d) _ -> concat <$> traverse (makePattern' d) ns
+      RecGadtC ns (length -> d) _ -> concat <$> traverse (makePattern' d) ns
+      ForallC _ _ con -> makePattern con
+      InfixC _ n _ -> makePattern' 2 n
+      -- d -> fail $ "makeSing.makePattern: unsupported data constructor type\n\n" ++ pprint d
 
     -- pattern SLeft :: () => (ma ~ 'Left a) => Sing a -> Sing ma
     -- pattern SLeft a <- (upSEither -> SLeft' a) where
     --   SLeft (Sing a) = UnsafeSing (Left a)
-    makePattern' :: Name -> [Type] -> Q [Dec]
-    makePattern' cname tys = do
-        args <- fresh tys
+    makePattern' :: Int -> Name -> Q [Dec]
+    makePattern' d cname = do
+        args <- fresh d
         res <- newName "r"
         let patSynType = forallT [] (pure []) $ forallT [] lessons $
               foldr (\l r -> (csing `appT` varT l) `arrT` r) (csing `appT` varT res) args
             lessons = sequence
-              $ eqT (varT res) (foldl (\l r -> l `appT` varT r) (promotedT cname) args)
-              :[] -- : [ eqT (varT v) (pure t) | v <- args | t <- tys ]
+              [eqT (varT res) (foldl (\l r -> l `appT` varT r) (promotedT cname) args)]
+              -- :[] -- : [ eqT (varT v) (pure t) | v <- args | t <- tys ]
             clauses = pure $ clause pats body [] where
                pats = [ conP 'Sing [varP a] |  a <- args ]
                body = normalB $ conE 'UnsafeSing `appE` do
@@ -242,10 +255,12 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
 
     -- {-# complete SLeft, SRight #-}
     makeComplete :: Q Dec
-    makeComplete = pure $ PragmaD $ CompleteP
-        do cons <&> \case
-             NormalC cname _ -> singDataCon cname
-             RecC cname _    -> singDataCon cname
-             _ -> error "unsupported data constructor type"
-        Nothing
+    makeComplete = pure $ PragmaD $ CompleteP (cons >>= fmap singDataCon . go) Nothing where
+      go = \case
+        NormalC n _ -> [n]
+        RecC n _    -> [n]
+        GadtC ns _ _ -> ns
+        RecGadtC ns _ _ -> ns
+        ForallC _ _ c -> go c
+        InfixC _ n _ -> [n]
 

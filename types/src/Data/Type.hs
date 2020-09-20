@@ -2,6 +2,7 @@
 {-# language ExplicitNamespaces #-}
 {-# language TemplateHaskell #-}
 {-# language StandaloneKindSignatures #-}
+{-# language FlexibleInstances #-}
 {-# language DataKinds #-}
 {-# language PolyKinds #-}
 {-# language RoleAnnotations #-}
@@ -23,6 +24,7 @@ module Data.Type
     ( Sing
     , fromSing
     )
+  , makeSing
   -- * Reifying terms and constraints into singletons
   , SingI(..)
   , Reifies, ify , reify
