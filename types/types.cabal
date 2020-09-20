@@ -36,6 +36,11 @@ flag dump
   description:
     Dump splices
 
+flag injectiveSucc
+  default: True
+  manual: True
+  description: Hack S for kind Nat to be injective.
+
 flag magicDict
   default: False
   manual: True
@@ -71,7 +76,9 @@ library
   if flag(dump)
     ghc-options: -ddump-splices
   if flag(magicDict)
-    cpp-options: -DUSE_MAGICDICT
+    cpp-options: -DUSE_MAGICDICT=1
+  if flag(injectiveSucc)
+    cpp-options: -DINJECTIVE_SUCC=1
   exposed-modules: 
     Data.Eq.Structural
     Data.Type

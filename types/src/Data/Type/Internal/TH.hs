@@ -160,16 +160,37 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
       gadtC [singDataCon' cname] (traverse (appT csing . pure) <$> bns) $
         conT sname `appT` foldl (\l (_,n) -> appT l (pure n)) (promotedT cname) bns
 
-    thd (_,_,x) = x
+    fresh :: Int -> Q [Name]
+    fresh n = traverse (newName . pure) $ take n $ cycle ['a'..'z']
 
-    -- this seems misimplemented
     -- instance SingI a => SingI ('Left a) where sing = SLeft sing
+    makeSingI :: Con -> Q [Dec]
+    makeSingI = \case
+      NormalC n (length -> d) -> pure <$> makeSingI' d n 
+      RecC n (length -> d) -> pure <$> makeSingI' d n
+      GadtC ns (length -> d) _ -> traverse (makeSingI' d) ns
+      RecGadtC ns (length -> d) _ -> traverse (makeSingI' d) ns
+      InfixC _ n _ -> pure <$> makeSingI' 2 n
+      ForallC _ _ c -> makeSingI c
+      -- d -> fail $ "makeSing.makeSingI: unsupported data constructor type\n\n" ++ pprint d
+
+    makeSingI' :: Int -> Name -> Q Dec
+    makeSingI' d n = do
+      ts <- fmap varT <$> fresh d
+      instanceD 
+        (traverse (appT $ conT ''SingI) ts)
+        (appT csingi $ foldl appT (promotedT n) ts)
+        [ valD (varP 'sing) 
+               (normalB $ foldl (\l _ -> appE l (varE 'sing)) (conE $ singDataCon n) ts)
+               []
+        ] 
+
+{-
     makeSingI :: Con -> Q [Dec]
     makeSingI = \case
         NormalC n ts -> pure <$> makeSingI' n (snd <$> ts)
         RecC n ts    -> pure <$> makeSingI' n (thd <$> ts)
         d -> fail $ "makeSing.makeSingI: unsupported data constructor type\n\n" ++ pprint d
-
     makeSingI' :: Name -> [Type] -> Q Dec
     makeSingI' n tys = instanceD cxt' typeQ
       [ valD (varP 'sing) (normalB $ foldl (\l _ -> appE l (varE 'sing)) (conE $ singDataCon n) tys) []
@@ -177,6 +198,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
       qtys = pure <$> tys
       cxt' = for qtys $ appT (conT ''SingI)
       typeQ = appT csingi $ foldl appT (promotedT n) qtys
+-}
 
 {-
     conName :: Con -> Name
@@ -185,9 +207,6 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     conName (InfixC _ n _) = n
     conName _ = error "unsupported constructor type"
 -}
-
-    fresh :: Int -> Q [Name]
-    fresh n = traverse (newName . pure) $ take n $ cycle ['a'..'z']
 
     -- upSEither :: Sing a -> SEither' a
     -- upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (UnsafeSing a))

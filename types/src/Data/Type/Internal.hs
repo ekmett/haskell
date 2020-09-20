@@ -20,6 +20,7 @@
 {-# language RoleAnnotations #-}
 {-# language ScopedTypeVariables #-}
 {-# language StandaloneKindSignatures #-}
+{-# language QuasiQuotes #-}
 {-# language TypeApplications #-}
 {-# language TypeFamilies #-}
 {-# language TypeOperators #-}
@@ -27,6 +28,8 @@
 {-# language Unsafe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+
+-- #define INJECTIVE_SUCC 1
 
 -- |
 -- Copyright :  (c) Edward Kmett 2020
@@ -119,7 +122,7 @@ reflect = fromSing (sing @k @a)
 type Type' = Some (TypeRep :: Type -> Type)
 
 toType :: Type' -> Type
-toType = unsafeCoerce 
+toType = unsafeCoerce
 
 fromType :: Type -> Type'
 fromType = unsafeCoerce
@@ -149,7 +152,7 @@ pattern SType t <- (upSType -> SType' t) where
 -- * Lowering Nats
 --------------------------------------------------------------------------------
 
-instance KnownNat a => SingI a where
+instance {-# OVERLAPPABLE #-} KnownNat a => SingI a where
   sing = UnsafeSing $ Nat $ TN.natVal (Proxy @a)
 
 instance Show Nat where
@@ -158,7 +161,9 @@ instance Show Nat where
 instance Eq Nat where
   (==) = (==) `on` fromNat
 
+#ifndef INJECTIVE_SUCC
 instance SEq Nat
+#endif
 
 instance Ord Nat where
   compare = compare `on` fromNat
@@ -234,8 +239,17 @@ type Z :: Nat
 type Z = 0
 
 -- | successor of a natural number
+#ifdef INJECTIVE_SUCC
+type S :: Nat -> Nat
+type S = S'
+-- this works as long as you basically stick to using constants, zero and S to instantiate nats
+-- and don't enable structural equality for it
+data family S' :: Nat -> k
+instance {-# OVERLAPPING #-} SingI a => SingI (S a) where sing = SS sing
+#else
 type S :: Nat -> Nat
 type S n = 1+n
+#endif
 
 type SNat' :: Nat -> Type
 data SNat' n where
@@ -247,7 +261,7 @@ upSNat (UnsafeSing 0) = unsafeCoerce SZ'
 upSNat (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
 
 -- |
--- This apparently trips a GHC bug, so you may have to use 
+-- This apparently trips a GHC bug, so you may have to use
 -- -Wno-overlapping-patterns. Note the loss of type inference
 -- from the "inaccessible" branch and the fact that it immediately
 -- then gets executed
@@ -302,7 +316,7 @@ pattern SIntS n <- (upSInt -> SIntS' n) where
 
 pattern SMkInt :: Sing n -> Sing (MkInt n)
 pattern SMkInt n <- Sing (UnsafeSing . fromIntegral -> n) where
-  SMkInt n = if fromSing n > fromIntegral (maxBound @Word) 
+  SMkInt n = if fromSing n > fromIntegral (maxBound @Word)
              then throw Overflow
              else UnsafeSing $ fromIntegral (fromSing n)
 
@@ -320,7 +334,7 @@ instance KnownNat n => SingI (MkPtr n) where
 
 pattern SMkPtr :: Sing n -> Sing (MkPtr n)
 pattern SMkPtr n <- Sing (UnsafeSing . fromIntegral . ptrToWordPtr -> n) where
-  SMkPtr n = if fromSing n > fromIntegral (maxBound @WordPtr) 
+  SMkPtr n = if fromSing n > fromIntegral (maxBound @WordPtr)
              then throw Overflow
              else UnsafeSing $ wordPtrToPtr $ fromIntegral (fromSing n)
 
@@ -337,10 +351,10 @@ instance KnownNat n => SingI (MkStablePtr n) where
   sing = SMkStablePtr sing
 
 pattern SMkStablePtr :: Sing n -> Sing (MkStablePtr n)
-pattern 
+pattern
   SMkStablePtr n <- Sing (UnsafeSing . fromIntegral . ptrToWordPtr . castStablePtrToPtr -> n) where
-  SMkStablePtr n 
-    = if fromSing n > fromIntegral (maxBound @WordPtr) 
+  SMkStablePtr n
+    = if fromSing n > fromIntegral (maxBound @WordPtr)
     then throw Overflow
     else UnsafeSing $ castPtrToStablePtr $ wordPtrToPtr $ fromIntegral (fromSing n)
 
