@@ -17,7 +17,7 @@
 -- Stability :  experimental
 -- Portability: non-portable
 
-module Data.Type.Internal.TH 
+module Data.Type.Internal.TH
   ( SingRules(..)
   , makeSing
   , makeSingWith
@@ -38,8 +38,6 @@ data SingRules = SingRules
   { singTyCon    :: Name -> Name
   , singDataCon  :: Name -> Name
   , singDataCon' :: Name -> Name
-  , singField    :: Name -> Name
-  , singField'   :: Name -> Name
   , singUp       :: Name -> Name
   }
 
@@ -48,8 +46,6 @@ defaultSingRules = SingRules{..} where
   singTyCon    =  mkName . (++"'") . ('S':) . nameBase
   singDataCon  =  mkName  . ('S':) . nameBase
   singDataCon' =  mkName . (++"'") . ('S':) . nameBase
-  singField    =  mkName  . ('s':) . nameBase
-  singField'   =  mkName  . (++"'") . ('s':) . nameBase
   singUp       =  mkName . ("upS"++) . nameBase
 
 makeSingWith :: SingRules -> Name -> Q [Dec]
@@ -122,8 +118,8 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     , pure <$> makeData
     , makeUp
     , concat <$> traverse makePattern cons
-    , traverse makeSingI cons
-    -- , makeComplete
+    , pure <$> makeComplete
+    -- , traverse makeSingI cons
     ] where
     sname = singTyCon name
 
@@ -149,21 +145,16 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     makeData :: Q Dec
     makeData = dataD (pure []) sname [plainTV (mkName "n")] Nothing scons [] where
       scons = cons <&> \case
-        --NormalC cname cbtys -> normalC (singDataCon' cname) $ cbtys <&> \case
-        --  (b,t) -> (,) b <$> appT csing (pure t)
-        --RecC cname cvbtys -> recC (singDataCon' cname) $ cvbtys <&> \case
-        --  (field,b,t) -> (,,) (singField field) b <$> appT csing (pure t)
-        NormalC cname cbtys -> do
-          bns <- for (zipWith (,) (cycle ['a'..'z']) cbtys) \case
-              (c,(b,_)) -> (,) b <$> (newName (pure c) >>= varT)
-          gadtC [singDataCon' cname] (traverse (appT csing . pure) <$> bns) $
-            conT sname `appT` foldl (\l (_,n) -> appT l (pure n)) (promotedT cname) bns
-        RecC cname cvbtys -> do
-          bns <- for (zipWith (,) (cycle ['a'..'z']) cvbtys) \case
-              (c,(f,b,_)) -> (,,) (singField' f) b <$> (newName (pure c) >>= varT)
-          recGadtC [singDataCon' cname] (_3 (appT csing . pure) <$> bns) $
-            conT sname `appT` foldl (\l (_,_,n) -> appT l (pure n)) (promotedT cname) bns
+        NormalC cname cbtys -> makeData' cname $ fst <$> cbtys
+        RecC cname cvbtys -> makeData' cname $ cvbtys <&> \(_,b,_) -> b
         _ -> fail "makeSing: unsupported data constructor type"
+
+    makeData' :: Name -> [Bang] -> Q Con
+    makeData' cname bangs = do
+      bns <- for (zipWith (,) bangs (cycle ['a'..'z'])) \case
+        (b,c) -> (,) b <$> (newName (pure c) >>= varT)
+      gadtC [singDataCon' cname] (traverse (appT csing . pure) <$> bns) $
+        conT sname `appT` foldl (\l (_,n) -> appT l (pure n)) (promotedT cname) bns
 
     -- instance SingI a => SingI ('Left a) where sing = SLeft sing
     makeSingI :: Con -> Q Dec
@@ -214,7 +205,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
                  foldl (\l r -> l `appE` (conE 'UnsafeSing `appE` varE r)) (conE (singDataCon' n)) args
             []
         _ -> fail "makeSing.makeUp: unsupported data constructor type"
-         
+
     -- we can't mimic the original record type, because they could have multiple field accessors of
     -- the same name, and record pattern synonyms can't share names
     makePattern :: Con -> Q [Dec]
@@ -233,11 +224,11 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     makePattern' cname tys = do
         args <- fresh tys
         res <- newName "res"
-        let patSynType = forallT [] (pure []) $ forallT [] lessons $ 
+        let patSynType = forallT [] (pure []) $ forallT [] lessons $
               foldr (\l r -> (csing `appT` varT l) `arrT` r) (csing `appT` varT res) args
             lessons = sequence
               $ eqT (varT res) (foldl (\l r -> l `appT` varT r) (promotedT cname) args)
-              : [ eqT (varT v) (pure t) | v <- args | t <- tys ] 
+              :[] -- : [ eqT (varT v) (pure t) | v <- args | t <- tys ]
             clauses = pure $ clause pats body [] where
                pats = [ conP 'Sing [varP a] |  a <- args ]
                body = normalB $ conE 'UnsafeSing `appE` do
@@ -247,8 +238,14 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
         sequence
           [ patSynSigD (singDataCon cname) patSynType
           , patSynD (singDataCon cname) (prefixPatSyn args) dir pat
-          ] 
+          ]
 
     -- {-# complete SLeft, SRight #-}
-    makeComplete :: Q [Dec]
-    makeComplete = pure []
+    makeComplete :: Q Dec
+    makeComplete = pure $ PragmaD $ CompleteP
+        do cons <&> \case
+             NormalC cname _ -> singDataCon cname
+             RecC cname _    -> singDataCon cname
+             _ -> error "unsupported data constructor type"
+        Nothing
+

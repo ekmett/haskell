@@ -28,11 +28,11 @@ module Data.Type
   , Reifies, ify , reify
   -- * Reflecting back down from types
   , reflect
-  -- * Types
+  -- * 'Type'
   , type Type
   , pattern Type
   , pattern SType
-  -- * Nats
+  -- * 'Nat'
   , Nat
   , toNat, fromNat
   , pattern Nat
@@ -42,30 +42,40 @@ module Data.Type
   , type S
   , pattern SS
   , pattern SZ
-  -- * Symbol
+  -- * 'Symbol'
   , Symbol
   , pattern Symbol
   , toSymbol
   , fromSymbol
-  -- * Int
+  -- * 'Int'
   , MkInt
   , pattern SIntS, pattern SIntZ, pattern SMkInt -- Int
-  -- * Char
+  -- * 'Char'
   , MkChar
-  -- * (,)
+  -- * '(,)'
   , pattern SPair -- (,)
-  -- * Either
+  -- * 'Either'
   , pattern SLeft, pattern SRight -- Either
-  -- * Maybe
+  -- * 'Maybe'
   , pattern SJust, pattern SNothing -- Maybe
-  -- * List
+  -- * 'List'
   , pattern SNil, pattern SCons -- List
-  -- * Bool
+  -- * 'Bool'
   , pattern STrue, pattern SFalse -- Bool
-  -- * Ordering
+  -- * 'Ordering'
   , pattern SLT, pattern SEQ, pattern SGT -- Ordering
+
+  -- * 'Const'
+  , pattern SConst
+  -- * 'Identity'
+  , pattern SIdentity
+  -- * 'Compose'
+  , pattern SCompose
   ) where
 
+import Control.Applicative
+import Data.Functor.Identity
+import Data.Functor.Compose
 import Data.Type.Internal
 import Data.Type.Internal.TH
 import Data.Kind (Type)
@@ -75,3 +85,6 @@ makeSing ''Either
 makeSing ''Maybe
 makeSing ''Bool
 makeSing ''Ordering
+makeSing ''Const
+makeSing ''Compose
+makeSing ''Identity
