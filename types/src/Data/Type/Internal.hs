@@ -146,8 +146,6 @@ pattern SType t <- (upSType -> SType' t) where
 
 --------------------------------------------------------------------------------
 -- * Lowering Nats
---
--- (let's make up a value rep for Nat til we get Nat=Natural in base)
 --------------------------------------------------------------------------------
 
 instance KnownNat a => SingI a where
@@ -413,28 +411,3 @@ pattern SPair a b <- Sing (UnsafeSing -> a, UnsafeSing -> b) where
   SPair a b = UnsafeSing (fromSing a, fromSing b)
 
 {-# complete SPair #-}
-
---------------------------------------------------------------------------------
--- * Lifting Composition
---------------------------------------------------------------------------------
-
-{-
-type SCompose' :: 
-  forall x y (f :: y -> Type) (g :: x -> y) (a :: x).
-  Compose f g a -> Type
-type role SCompose' nominal
-data SCompose' t where
-  SCompose' :: Sing a -> SCompose' ('Compose a)
-
-upSCompose :: Sing a -> SCompose' a
-upSCompose (Sing (Compose a)) = unsafeCoerce $ SCompose' (UnsafeSing a)
-
-pattern SCompose :: Sing a -> Sing ('Compose a)
-pattern SCompose a <- Sing (Compose (UnsafeSing -> a)) where
-  SCompose a = UnsafeSing (Compose (fromSing a))
-
-{-# complete SCompose #-}
-
-instance SingI a => SingI ('Compose a) where sing = SCompose sing
--}
-
