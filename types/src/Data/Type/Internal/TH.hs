@@ -223,7 +223,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     makePattern' :: Name -> [Type] -> Q [Dec]
     makePattern' cname tys = do
         args <- fresh tys
-        res <- newName "res"
+        res <- newName "r"
         let patSynType = forallT [] (pure []) $ forallT [] lessons $
               foldr (\l r -> (csing `appT` varT l) `arrT` r) (csing `appT` varT res) args
             lessons = sequence

@@ -259,11 +259,11 @@ upSNat (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
 --    In a case alternative: SS SZ -> ...
 -- "hi"
 -- @
-pattern SZ :: () => (n ~ Z) => Sing n
+pattern SZ :: () => n ~ Z => Sing n
 pattern SZ <- (upSNat -> SZ') where
   SZ = UnsafeSing 0
 
-pattern SS :: () => (m ~ S n) => Sing n -> Sing m
+pattern SS :: () => m ~ S n => Sing n -> Sing m
 pattern SS n <- (upSNat -> SS' n) where
   SS n = UnsafeSing $ succ $ fromSing n
 
@@ -290,7 +290,7 @@ upSInt :: Sing n -> SInt' n
 upSInt (UnsafeSing 0) = unsafeCoerce SIntZ'
 upSInt (UnsafeSing n) = unsafeCoerce $ SIntS' (UnsafeSing (n-1))
 
-pattern SIntZ :: () => (n ~ MkInt Z) => Sing n
+pattern SIntZ :: () => n ~ MkInt Z => Sing n
 pattern SIntZ <- (upSInt -> SIntZ') where
   SIntZ = UnsafeSing 0
 
@@ -414,11 +414,11 @@ upSList :: Sing a -> SList' a
 upSList (Sing [])     = unsafeCoerce SNil'
 upSList (Sing (a:as)) = unsafeCoerce $ SCons' (UnsafeSing a) (UnsafeSing as)
 
-pattern SNil :: () => (xs ~ '[]) => Sing xs
+pattern SNil :: () => xs ~ '[] => Sing xs
 pattern SNil <- (upSList -> SNil') where
   SNil = UnsafeSing []
 
-pattern SCons :: () => (aas ~ (a ': as)) => Sing a -> Sing as -> Sing aas
+pattern SCons :: () => aas ~ (a ': as) => Sing a -> Sing as -> Sing aas
 pattern SCons a as <- (upSList -> SCons' a as) where
   SCons (Sing a) (Sing as) = UnsafeSing (a:as)
 

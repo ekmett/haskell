@@ -78,11 +78,14 @@ module Data.Type
   , pattern SIdentity
   -- ** 'Compose'
   , pattern SCompose
+  -- ** 'Proxy'
+  , pattern SProxy
   ) where
 
 import Control.Applicative
 import Data.Functor.Identity
 import Data.Functor.Compose
+import Data.Proxy
 import Data.Type.Internal
 import Data.Type.Internal.TH
 import Data.Kind (Type)
@@ -95,3 +98,4 @@ makeSing ''Ordering
 makeSing ''Const
 makeSing ''Compose
 makeSing ''Identity
+makeSing ''Proxy
