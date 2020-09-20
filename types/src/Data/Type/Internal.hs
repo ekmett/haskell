@@ -44,6 +44,8 @@ import Data.Kind
 import Data.Proxy
 import Data.Some
 import Data.Type.Equality
+import Foreign.Ptr
+import Foreign.StablePtr
 import GHC.Exts
 import GHC.TypeLits as TL
 import GHC.TypeNats as TN
@@ -51,7 +53,6 @@ import Numeric.Natural
 import Text.Read hiding (Symbol)
 import Type.Reflection
 import Unsafe.Coerce
-import Data.Functor.Compose
 
 --------------------------------------------------------------------------------
 -- * Singletons
@@ -308,6 +309,44 @@ pattern SMkInt n <- Sing (UnsafeSing . fromIntegral -> n) where
 {-# complete SMkInt #-}
 
 --------------------------------------------------------------------------------
+-- * Lifting (Ptr a)
+--------------------------------------------------------------------------------
+
+type MkPtr :: forall a. Nat -> Ptr a
+type MkPtr = FromNat
+
+instance KnownNat n => SingI (MkPtr n) where
+  sing = SMkPtr sing
+
+pattern SMkPtr :: Sing n -> Sing (MkPtr n)
+pattern SMkPtr n <- Sing (UnsafeSing . fromIntegral . ptrToWordPtr -> n) where
+  SMkPtr n = if fromSing n > fromIntegral (maxBound @WordPtr) 
+             then throw Overflow
+             else UnsafeSing $ wordPtrToPtr $ fromIntegral (fromSing n)
+
+{-# complete SMkPtr #-}
+
+--------------------------------------------------------------------------------
+-- * Lifting (StablePtr a)
+--------------------------------------------------------------------------------
+
+type MkStablePtr :: forall a. Nat -> StablePtr a
+type MkStablePtr = FromNat
+
+instance KnownNat n => SingI (MkStablePtr n) where
+  sing = SMkStablePtr sing
+
+pattern SMkStablePtr :: Sing n -> Sing (MkStablePtr n)
+pattern 
+  SMkStablePtr n <- Sing (UnsafeSing . fromIntegral . ptrToWordPtr . castStablePtrToPtr -> n) where
+  SMkStablePtr n 
+    = if fromSing n > fromIntegral (maxBound @WordPtr) 
+    then throw Overflow
+    else UnsafeSing $ castPtrToStablePtr $ wordPtrToPtr $ fromIntegral (fromSing n)
+
+{-# complete SMkStablePtr #-}
+
+--------------------------------------------------------------------------------
 -- * Lifting Char
 --------------------------------------------------------------------------------
 
@@ -362,7 +401,7 @@ instance KnownSymbol s => SingI s where
   sing = UnsafeSing $ Symbol $ symbolVal $ Proxy @s
 
 --------------------------------------------------------------------------------
--- * Lifting Lists
+-- * Singleton Lists
 --------------------------------------------------------------------------------
 
 type SList' :: forall a. [a] -> Type
@@ -392,7 +431,7 @@ instance (SingI a, SingI as) => SingI (a ': as) where
 {-# complete SNil, SCons #-}
 
 --------------------------------------------------------------------------------
--- * Lifting Products
+-- * Singleton Products
 --------------------------------------------------------------------------------
 
 type SPair' :: forall a b. (a,b) -> Type

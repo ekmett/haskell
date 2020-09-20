@@ -12,6 +12,8 @@ import Data.List.NonEmpty
 import Data.Proxy
 import Data.STRef
 import Data.Void
+import Foreign.Ptr
+import Foreign.StablePtr
 import GHC.Prim
 import GHC.Types
 
@@ -32,6 +34,8 @@ instance (SEq a, SEq b) => SEq (a, b)
 instance (SEq a, SEq b) => SEq (Either a b)
 instance SEq a => SEq [a]
 instance SEq a => SEq (NonEmpty a)
+instance SEq (Ptr a)
+instance SEq (StablePtr a)
 
 withPtrEq :: SEq a => a -> a -> Bool
 withPtrEq !a !b 

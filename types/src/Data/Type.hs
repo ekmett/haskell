@@ -26,13 +26,13 @@ module Data.Type
   -- * Reifying terms and constraints into singletons
   , SingI(..)
   , Reifies, ify , reify
-  -- * Reflecting back down from types
+  -- * Lowering kinds to types
   , reflect
-  -- * 'Type'
+  -- ** 'Type'
   , type Type
   , pattern Type
   , pattern SType
-  -- * 'Nat'
+  -- ** 'Nat'
   , Nat
   , toNat, fromNat
   , pattern Nat
@@ -42,34 +42,41 @@ module Data.Type
   , type S
   , pattern SS
   , pattern SZ
-  -- * 'Symbol'
+  -- ** 'Symbol'
   , Symbol
   , pattern Symbol
   , toSymbol
   , fromSymbol
-  -- * 'Int'
+  -- * Lifting types to kinds
+  -- ** 'Int'
   , MkInt
   , pattern SIntS, pattern SIntZ, pattern SMkInt -- Int
-  -- * 'Char'
+  -- ** 'Char'
   , MkChar
-  -- * '(,)'
+  -- ** @'Ptr' a@
+  , MkPtr
+  , pattern SMkPtr
+  -- ** @'StablePtr' a@
+  , MkStablePtr
+  , pattern SMkStablePtr
+  -- * Singletons
+  -- ** '(,)'
   , pattern SPair -- (,)
-  -- * 'Either'
+  -- ** 'Either'
   , pattern SLeft, pattern SRight -- Either
-  -- * 'Maybe'
+  -- ** 'Maybe'
   , pattern SJust, pattern SNothing -- Maybe
-  -- * 'List'
+  -- ** 'List'
   , pattern SNil, pattern SCons -- List
-  -- * 'Bool'
+  -- ** 'Bool'
   , pattern STrue, pattern SFalse -- Bool
-  -- * 'Ordering'
+  -- ** 'Ordering'
   , pattern SLT, pattern SEQ, pattern SGT -- Ordering
-
-  -- * 'Const'
+  -- ** 'Const'
   , pattern SConst
-  -- * 'Identity'
+  -- ** 'Identity'
   , pattern SIdentity
-  -- * 'Compose'
+  -- ** 'Compose'
   , pattern SCompose
   ) where
 
