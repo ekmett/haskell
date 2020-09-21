@@ -164,6 +164,40 @@ reflect :: forall k (a::k). SingI a => k
 reflect = fromSing (sing @k @a)
 
 --------------------------------------------------------------------------------
+-- * Lowering Constraint
+--------------------------------------------------------------------------------
+
+type Constraint' = Some Dict
+
+toConstraint :: Constraint' -> Constraint
+toConstraint = unsafeCoerce
+
+fromConstraint :: Constraint -> Constraint'
+fromConstraint = unsafeCoerce
+
+instance Show Constraint where
+  showsPrec d _ = showParen (d > 10) $
+    showString "Constraint Dict"
+
+pattern Constraint :: Dict p -> Constraint
+pattern Constraint t <- (fromConstraint -> Some t) where
+  Constraint t = toConstraint (Some t)
+
+instance p => SingI p where
+  sing = SING $ Constraint $ Dict @p
+
+type SConstraint' :: Constraint -> Type
+data SConstraint' p where
+  SConstraint' :: Dict p -> SConstraint' p
+
+upSConstraint :: Sing p -> SConstraint' p
+upSConstraint (Sing (Constraint t)) = unsafeCoerce (SConstraint' t)
+
+pattern SConstraint :: Dict p -> Sing p
+pattern SConstraint t <- (upSConstraint -> SConstraint' t) where
+  SConstraint t = SING $ Constraint t
+
+--------------------------------------------------------------------------------
 -- * Lowering Types
 --------------------------------------------------------------------------------
 

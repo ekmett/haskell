@@ -37,6 +37,10 @@ module Data.Type
   , type Type
   , pattern Type
   , pattern SType
+  -- ** 'Constraint'
+  , type Constraint
+  , pattern Constraint
+  , pattern SConstraint
   -- ** 'Nat'
   , Nat
   , toNat, fromNat
@@ -99,8 +103,7 @@ module Data.Type
   , pattern SHRefl
   ) where
 
-import Data.Kind (Type)
 import Data.Type.Internal
 import Data.Type.Internal.Instances
 import Data.Type.Internal.TH
-import GHC.TypeLits (Nat, Symbol)
+import GHC.Types (Constraint, Type, Nat, Symbol)
