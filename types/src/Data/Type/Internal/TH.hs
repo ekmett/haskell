@@ -294,7 +294,12 @@ makeNice :: Type -> Q [Dec]
 makeNice (pure -> t) = do
   let s# = conT ''S#
       z# = conT ''Z#
-  [d|instance Nice $(t) where
-       type NiceS = $(s#) $(t)
-       type NiceZ = $(z#) $(t)
-       sinj _ = Refl |]
+      ss = conE 'SS
+      sz = conE 'SZ
+  [d|
+    instance Nice $(t) where
+      type NiceS = $(s#) $(t)
+      type NiceZ = $(z#) $(t)
+      sinj _ = Refl
+    instance SingI n => SingI ($(s#) $(t) n) where sing = $(ss) sing
+    instance SingI ($(z#) $(t)) where sing = $(sz) |]

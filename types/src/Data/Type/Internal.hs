@@ -199,19 +199,23 @@ pattern Constraint :: Dict p -> Constraint
 pattern Constraint t <- (fromConstraint -> Some t) where
   Constraint t = toConstraint (Some t)
 
+
+type SConstraint# :: Constraint -> Type
+data SConstraint# p where
+  SConstraint# :: Dict p -> SConstraint# p
+
+upSConstraint# :: Sing p -> SConstraint# p
+upSConstraint# (Sing (Constraint t)) = unsafeCoerce (SConstraint# t)
+
+pattern SConstraint' :: Dict p -> Sing @Constraint p
+pattern SConstraint' t <- (upSConstraint# -> SConstraint# t) where
+  SConstraint' t = SING $ Constraint t
+
+pattern SConstraint :: () => p => Sing p
+pattern SConstraint = SConstraint' Dict
+
 instance p => SingI p where
-  sing = SING $ Constraint $ Dict @p
-
-type SConstraint' :: Constraint -> Type
-data SConstraint' p where
-  SConstraint' :: Dict p -> SConstraint' p
-
-upSConstraint :: Sing p -> SConstraint' p
-upSConstraint (Sing (Constraint t)) = unsafeCoerce (SConstraint' t)
-
-pattern SConstraint :: Dict p -> Sing p
-pattern SConstraint t <- (upSConstraint -> SConstraint' t) where
-  SConstraint t = SING $ Constraint t
+  sing = SConstraint
 
 --------------------------------------------------------------------------------
 -- * Lowering Types
@@ -371,10 +375,14 @@ concat <$> for
   , ''Int, ''Int8, ''Int16, ''Int32, ''Int64, ''IntPtr
   , ''Word, ''Word8, ''Word16, ''Word32, ''Word64, ''WordPtr
   ] \(TH.conT -> n) ->
-  [d|instance Nice $(n) where
-       type NiceZ = Z# $(n)
-       type NiceS = S# $(n)
-       sinj _ = Refl |]
+  [d|
+    instance Nice $(n) where
+      type NiceZ = Z# $(n)
+      type NiceS = S# $(n)
+      sinj _ = Refl 
+    instance SingI n => SingI (S# $(n) n) where sing = SS sing
+    instance SingI (Z# $(n)) where sing = SZ
+    |]
 
 type SIntegral' :: forall a. a -> Type
 data SIntegral' (n :: a) where
@@ -397,12 +405,18 @@ pattern SS n <- (upSIntegral -> SS' n) where
 
 {-# complete SS, SZ #-}
 
-instance forall a (n::a). (Nice a, NiceS ~ S# a, SingI n) => SingI (S# a n) where
+
+
+{-
+-- this breaks homo in Data.Type.Constraint, spooky
+instance forall a (n::a). (Nice a, NiceS ~ S# a, SingI n) => SingI @a (S# a n) where
   sing = case sinj (proxy# @n) of
     Refl -> SS (sing @a @n)
 
-instance forall a. (Integral a, Z ~ Z# a) => SingI (Z# a) where
+instance forall a. (Integral a, Z ~ Z# a) => SingI @a (Z# a) where
   sing = SZ
+
+-}
 
 --------------------------------------------------------------------------------
 -- * Lifting Dict and types that are otherwise singleton

@@ -101,6 +101,7 @@ library
   exposed-modules: 
     Data.Eq.Strict
     Data.Type
+    Data.Type.Constraint
     Data.Type.Some
     Data.Type.Unsafe
     Data.Type.TH
