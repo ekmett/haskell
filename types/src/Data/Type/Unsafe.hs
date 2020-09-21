@@ -18,4 +18,4 @@ module Data.Type.Unsafe
 
 import Data.Type.Internal
 import Data.Type.Internal.TH
-import Data.Type ()
+import Data.Type.Internal.Instances ()

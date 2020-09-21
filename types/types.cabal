@@ -87,4 +87,5 @@ library
     Data.Type.TH
   other-modules:
     Data.Type.Internal
+    Data.Type.Internal.Instances
     Data.Type.Internal.TH

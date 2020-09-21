@@ -6,4 +6,4 @@ module Data.Type.TH
   ) where
 
 import Data.Type.Internal.TH
-import Data.Type ()
+import Data.Type.Internal.Instances ()

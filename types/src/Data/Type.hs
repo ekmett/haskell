@@ -18,7 +18,7 @@
 -- Portability: non-portable
 
 module Data.Type
-  ( 
+  (
   -- * Singleton types and reflection from singletons
     Sing
     ( Sing
@@ -67,7 +67,9 @@ module Data.Type
   -- ** 'Maybe'
   , pattern SJust, pattern SNothing -- Maybe
   -- ** 'List'
-  , pattern SNil, pattern SCons -- List
+  , pattern SNil, pattern (:#) -- List
+  -- ** 'NonEmpty'
+  , pattern (:|#) -- NonEmpty
   -- ** 'Bool'
   , pattern STrue, pattern SFalse -- Bool
   -- ** 'Ordering'
@@ -82,20 +84,8 @@ module Data.Type
   , pattern SProxy
   ) where
 
-import Control.Applicative
-import Data.Functor.Identity
-import Data.Functor.Compose
-import Data.Proxy
-import Data.Type.Internal
-import Data.Type.Internal.TH
 import Data.Kind (Type)
+import Data.Type.Internal
+import Data.Type.Internal.Instances
+import Data.Type.Internal.TH
 import GHC.TypeLits (Nat, Symbol)
-
-makeSing ''Either
-makeSing ''Maybe
-makeSing ''Bool
-makeSing ''Ordering
-makeSing ''Const
-makeSing ''Compose
-makeSing ''Identity
-makeSing ''Proxy

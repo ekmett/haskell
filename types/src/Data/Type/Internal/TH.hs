@@ -7,7 +7,6 @@
 {-# Language ParallelListComp #-}
 {-# Language ImportQualifiedPost #-}
 {-# Language Unsafe #-}
--- {-# OPTIONS_GHC -Wno-unused-binds #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -211,8 +210,8 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
 -}
 
     -- upSEither :: Sing a -> SEither' a
-    -- upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (UnsafeSing a))
-    -- upSEither (Sing (Right b)) = unsafeCoerce (SRight' (UnsafeSing b))
+    -- upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (SING a))
+    -- upSEither (Sing (Right b)) = unsafeCoerce (SRight' (SING b))
     makeUp :: Q [Dec]
     makeUp = sequence $
       [ sigD (singUp name) $ appT csing (varT (mkName "a")) `arrT` appT (conT sname) (varT (mkName "a"))
@@ -233,7 +232,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
       clause
         [conP 'Sing [conP n (varP <$> args)]]
         do normalB $ varE 'unsafeCoerce `appE`
-             foldl (\l r -> l `appE` (conE 'UnsafeSing `appE` varE r)) (conE (singDataCon' n)) args
+             foldl (\l r -> l `appE` (conE 'SING `appE` varE r)) (conE (singDataCon' n)) args
         []
 
     eqT :: Q Type -> Q Type -> Q Type
@@ -253,7 +252,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
 
     -- pattern SLeft :: () => (ma ~ 'Left a) => Sing a -> Sing ma
     -- pattern SLeft a <- (upSEither -> SLeft' a) where
-    --   SLeft (Sing a) = UnsafeSing (Left a)
+    --   SLeft (Sing a) = SING (Left a)
     makePattern' :: Int -> Name -> Q [Dec]
     makePattern' d cname = do
         args <- fresh d
@@ -265,7 +264,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
               -- :[] -- : [ eqT (varT v) (pure t) | v <- args | t <- tys ]
             clauses = pure $ clause pats body [] where
                pats = [ conP 'Sing [varP a] |  a <- args ]
-               body = normalB $ conE 'UnsafeSing `appE` do
+               body = normalB $ conE 'SING `appE` do
                  foldl (\l r -> l `appE` varE r) (conE cname) args
             pat = viewP (varE (singUp name)) $ conP (singDataCon' cname) (varP <$> args)
             dir = explBidir clauses

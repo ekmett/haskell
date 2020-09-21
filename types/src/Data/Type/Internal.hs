@@ -1,9 +1,7 @@
 {-# language CPP #-}
-{-# Language BlockArguments #-}
-{-# Language ImportQualifiedPost #-}
-{-# Language LambdaCase #-}
-{-# Language ViewPatterns #-}
 {-# language AllowAmbiguousTypes #-}
+{-# language BangPatterns #-}
+{-# language BlockArguments #-}
 {-# language ConstraintKinds #-}
 {-# language DataKinds #-}
 {-# language DerivingStrategies #-}
@@ -11,28 +9,26 @@
 {-# language FlexibleInstances #-}
 {-# language GADTs #-}
 {-# language GeneralizedNewtypeDeriving #-}
+{-# language ImportQualifiedPost #-}
 {-# language LambdaCase #-}
 {-# language MagicHash #-}
 {-# language PatternSynonyms #-}
 {-# language PolyKinds #-}
 {-# language QuantifiedConstraints #-}
+{-# language QuasiQuotes #-}
 {-# language RankNTypes #-}
 {-# language RoleAnnotations #-}
 {-# language ScopedTypeVariables #-}
 {-# language StandaloneKindSignatures #-}
-{-# language QuasiQuotes #-}
+{-# language TemplateHaskell #-}
 {-# language TypeApplications #-}
 {-# language TypeFamilies #-}
 {-# language TypeOperators #-}
-{-# language ViewPatterns #-}
-{-# language Unsafe #-}
 {-# language UndecidableInstances #-}
-{-# language TemplateHaskell #-}
-{-# language ImportQualifiedPost #-}
+{-# language Unsafe #-}
+{-# language ViewPatterns #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-
--- #define INJECTIVE_SUCC 1
 
 -- |
 -- Copyright :  (c) Edward Kmett 2020
@@ -43,14 +39,19 @@
 
 module Data.Type.Internal where
 
-import Data.Eq.Structural
+import Control.Applicative
+import Control.Concurrent
 import Data.Function
+import Data.IORef
+import Data.STRef
 import Data.Int
+import Data.List.NonEmpty qualified as NE
 import Data.Kind
 import Data.Proxy
 import Data.Some
 import Data.Traversable
 import Data.Type.Equality
+import Data.Void
 import Data.Word
 import Foreign.Ptr
 import Foreign.StablePtr
@@ -64,34 +65,66 @@ import Unsafe.Coerce
 import Language.Haskell.TH qualified as TH
 
 --------------------------------------------------------------------------------
+-- * Structural Equality
+--------------------------------------------------------------------------------
+
+-- | A type with structural equality
+--
+-- @
+-- x '==' y ==> f x '==' f y
+-- @
+class Eq a => SEq a
+instance SEq (MVar a)
+instance SEq (IORef a)
+instance SEq (STRef s a)
+instance SEq (Proxy a)
+instance SEq ThreadId
+instance SEq a => SEq (Const a b)
+instance SEq Bool
+instance SEq ()
+instance SEq Void
+instance SEq Ordering
+instance SEq a => SEq (Maybe a)
+instance (SEq a, SEq b) => SEq (a, b)
+instance (SEq a, SEq b) => SEq (Either a b)
+instance SEq a => SEq [a]
+instance SEq a => SEq (NE.NonEmpty a)
+instance SEq (Ptr a)
+instance SEq (StablePtr a)
+
+--------------------------------------------------------------------------------
 -- * Singletons
 --------------------------------------------------------------------------------
 
 type Sing :: forall k. k -> Type
-newtype Sing (a :: k) = UnsafeSing { fromSing :: k }
+newtype Sing (a :: k) = SING { fromSing :: k }
 
 instance (Typeable k, Show k) => Show (Sing (a :: k)) where
   showsPrec d (Sing k) = showParen (d > 10) $
     showString "Sing @" . showsPrec 11 (typeRep @k) . showChar ' ' . showsPrec 11 k
 
 pattern Sing :: k -> Sing (a :: k)
-pattern Sing x <- (UnsafeSing x)
+pattern Sing x <- (SING x)
 
 {-# complete Sing #-}
 
 instance Eq (Sing a) where
   _ == _ = True
 
-instance SEq (Sing a)
-
 instance Ord (Sing a) where
   compare _ _ = EQ
+
+instance SEq (Sing a)
 
 -- assumes equality is structural.
 instance SEq k => TestEquality (Sing :: k -> Type) where
   testEquality i j
     | fromSing i == fromSing j = Just (unsafeCoerce Refl)
     | otherwise = Nothing
+
+--------------------------------------------------------------------------------
+-- * Reflection
+--------------------------------------------------------------------------------
 
 type SingI :: forall k. k -> Constraint
 class SingI (a :: k) where
@@ -115,9 +148,8 @@ ify :: Sing a -> (SingI a => r) -> r
 ify s r = ify# (\_ -> r) s proxy#
 
 reify :: k -> (forall (a::k). SingI a => Proxy# a -> r) -> r
-reify k f = ify# f (UnsafeSing k) proxy#
+reify k f = ify# f (SING k) proxy#
 
--- ambiguous types
 reflect :: forall k a. Reifies k a => k
 reflect = fromSing (sing @k @a)
 
@@ -141,7 +173,7 @@ pattern Type t <- (fromType -> Some t) where
   Type t = toType (Some t)
 
 instance Typeable a => SingI (a :: Type) where
-  sing = UnsafeSing $ Type $ typeRep @a
+  sing = SING $ Type $ typeRep @a
 
 type SType' :: Type -> Type
 data SType' a where
@@ -152,24 +184,20 @@ upSType (Sing (Type t)) = unsafeCoerce (SType' t)
 
 pattern SType :: TypeRep a -> Sing (a :: Type)
 pattern SType t <- (upSType -> SType' t) where
-  SType t = UnsafeSing $ Type t
+  SType t = SING $ Type t
 
 --------------------------------------------------------------------------------
 -- * Lowering Nats
 --------------------------------------------------------------------------------
 
 instance {-# OVERLAPPABLE #-} KnownNat a => SingI a where
-  sing = UnsafeSing $ Nat $ TN.natVal (Proxy @a)
+  sing = SING $ Nat $ TN.natVal (Proxy @a)
 
 instance Show Nat where
   showsPrec d = showsPrec d . fromNat
 
 instance Eq Nat where
   (==) = (==) `on` fromNat
-
-#ifndef INJECTIVE_SUCC
-instance SEq Nat
-#endif
 
 instance Ord Nat where
   compare = compare `on` fromNat
@@ -283,25 +311,24 @@ concat <$> for
        type NiceS = MkS $(n)
        sinj _ = Refl |]
 
-
 type SIntegral' :: forall a. a -> Type
 data SIntegral' (n :: a) where
   SZ' :: SIntegral' Z
   SS' :: Sing n -> SIntegral' (S n)
 
 upSIntegral :: forall a (n::a). Integral a => Sing n -> SIntegral' n
-upSIntegral (UnsafeSing 0) = unsafeCoerce SZ'
-upSIntegral (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
+upSIntegral (SING 0) = unsafeCoerce SZ'
+upSIntegral (SING n) = unsafeCoerce $ SS' (SING (n-1))
 
 -- shared for both injective types and for Nat
 
 pattern SZ :: forall a (n::a). Integral a => n ~ Z => Sing n
 pattern SZ <- (upSIntegral -> SZ') where
-  SZ = UnsafeSing 0
+  SZ = SING 0
 
 pattern SS :: forall a (n::a). Integral a => forall (n'::a). n ~ S n' => Sing n' -> Sing n
 pattern SS n <- (upSIntegral -> SS' n) where
-  SS (Sing n) = UnsafeSing (S n)
+  SS (Sing n) = SING (S n)
 
 {-# complete SS, SZ #-}
 
@@ -311,18 +338,6 @@ instance forall a (n::a). (Nice a, NiceS ~ MkS a, SingI n) => SingI (MkS a n) wh
 
 instance forall a. (Integral a, Z ~ MkZ a) => SingI (MkZ a) where
   sing = SZ
-
------------------------------------------------------------------------------
--- * Lifting Natural
---
--- Unlike 'Nat' we can provide an injective 'S' here
--- Unfortunately we don't get a nice syntax for huge numeric
--- literals, so uh, don't use this for that. Use 'Nat'.
---
--- When GHC releases a version with 'Nat' = 'Natural', we'll just
--- make our own 'Nat' type.
------------------------------------------------------------------------------
-
 
 --------------------------------------------------------------------------------
 -- * Lifting (Ptr a)
@@ -337,8 +352,8 @@ instance SingI n => SingI (MkPtr n) where
   sing = SMkPtr sing
 
 pattern SMkPtr :: Sing n -> Sing (MkPtr n)
-pattern SMkPtr n <- Sing (UnsafeSing . ptrToWordPtr -> n) where
-  SMkPtr (Sing n) = UnsafeSing $ wordPtrToPtr n
+pattern SMkPtr n <- Sing (SING . ptrToWordPtr -> n) where
+  SMkPtr (Sing n) = SING $ wordPtrToPtr n
 
 {-# complete SMkPtr #-}
 
@@ -355,8 +370,8 @@ instance SingI n => SingI (MkStablePtr n) where
   sing = SMkStablePtr sing
 
 pattern SMkStablePtr :: Sing n -> Sing (MkStablePtr n)
-pattern SMkStablePtr n <- Sing (UnsafeSing . castStablePtrToPtr -> n) where
-  SMkStablePtr (Sing n) = UnsafeSing $ castPtrToStablePtr n
+pattern SMkStablePtr n <- Sing (SING . castStablePtrToPtr -> n) where
+  SMkStablePtr (Sing n) = SING $ castPtrToStablePtr n
 
 {-# complete SMkStablePtr #-}
 
@@ -371,7 +386,7 @@ type MkChar = FromSymbol
 
 instance KnownSymbol s => SingI (MkChar s) where
   sing = case symbolVal $ Proxy @s of
-    [c] -> UnsafeSing c
+    [c] -> SING c
     _ -> error "SChar.sing: bad argument"
 
 --------------------------------------------------------------------------------
@@ -412,7 +427,7 @@ instance IsString Symbol where
   fromString = toSymbol
 
 instance KnownSymbol s => SingI s where
-  sing = UnsafeSing $ Symbol $ symbolVal $ Proxy @s
+  sing = SING $ Symbol $ symbolVal $ Proxy @s
 
 --------------------------------------------------------------------------------
 -- * Singleton Lists
@@ -422,27 +437,57 @@ type SList' :: forall a. [a] -> Type
 type role SList' nominal
 data SList' a where
   SNil' :: SList' '[]
-  SCons' :: Sing a -> Sing as -> SList' (a ': as)
+  (:%) :: Sing a -> Sing as -> SList' (a ': as)
+
+infixr 5 :%
 
 upSList :: Sing a -> SList' a
 upSList (Sing [])     = unsafeCoerce SNil'
-upSList (Sing (a:as)) = unsafeCoerce $ SCons' (UnsafeSing a) (UnsafeSing as)
+upSList (Sing (a:as)) = unsafeCoerce $ SING a :% SING as
 
 pattern SNil :: () => xs ~ '[] => Sing xs
 pattern SNil <- (upSList -> SNil') where
-  SNil = UnsafeSing []
+  SNil = SING []
 
-pattern SCons :: () => aas ~ (a ': as) => Sing a -> Sing as -> Sing aas
-pattern SCons a as <- (upSList -> SCons' a as) where
-  SCons (Sing a) (Sing as) = UnsafeSing (a:as)
+pattern (:#) :: () => aas ~ (a ': as) => Sing a -> Sing as -> Sing aas
+pattern a :# as <- (upSList -> a :% as) where
+  Sing a :# Sing as = SING (a:as)
 
-{-# complete SNil, SCons #-}
+infixr 5 :#
+
+{-# complete SNil, (:#) #-}
 
 instance SingI '[] where
   sing = SNil
 
 instance (SingI a, SingI as) => SingI (a ': as) where
-  sing = SCons sing sing
+  sing = sing :# sing
+
+--------------------------------------------------------------------------------
+-- * Singleton NonEmpty Lists
+--------------------------------------------------------------------------------
+
+type SNonEmpty' :: forall a. NE.NonEmpty a -> Type
+type role SNonEmpty' nominal
+data SNonEmpty' a where
+  (:|%) :: Sing a -> Sing as -> SNonEmpty' (a 'NE.:| as)
+
+infixr 5 :|%
+
+upSNonEmpty :: Sing a -> SNonEmpty' a
+upSNonEmpty (Sing (a NE.:| as)) = unsafeCoerce $ SING a :|% SING as
+
+pattern (:|#) :: () => aas ~ (a 'NE.:| as) => Sing a -> Sing as -> Sing aas
+pattern a :|# as <- (upSNonEmpty -> a :|% as) where
+  Sing a :|# Sing as = SING (a NE.:| as)
+
+infixr 5 :|#
+
+{-# complete (:|#) #-}
+
+instance (SingI a, SingI as) => SingI (a 'NE.:| as) where
+  sing = sing :|# sing
+
 
 --------------------------------------------------------------------------------
 -- * Singleton Products
@@ -454,11 +499,11 @@ data SPair' t where
   SPair' :: Sing a -> Sing b -> SPair' '(a, b)
 
 upSPair :: Sing a -> SPair' a
-upSPair (Sing (a,b)) = unsafeCoerce $ SPair' (UnsafeSing a) (UnsafeSing b)
+upSPair (Sing (a,b)) = unsafeCoerce $ SPair' (SING a) (SING b)
 
-pattern SPair :: Sing a -> Sing b -> Sing '(a, b)
-pattern SPair a b <- Sing (UnsafeSing -> a, UnsafeSing -> b) where
-  SPair a b = UnsafeSing (fromSing a, fromSing b)
+pattern SPair :: () => r ~ '(a,b) => Sing a -> Sing b -> Sing r
+pattern SPair a b <- (upSPair -> SPair' a b) where
+  SPair (Sing a) (Sing b) = SING (a, b)
 
 {-# complete SPair #-}
 
