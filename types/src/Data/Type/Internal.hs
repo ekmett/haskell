@@ -90,6 +90,9 @@ instance StrictEq (p :- q)
 instance StrictEq Ordering
 instance StrictEq a => StrictEq (Maybe a)
 instance (StrictEq a, StrictEq b) => StrictEq (a, b)
+instance (StrictEq a, StrictEq b, StrictEq c) => StrictEq (a, b, c)
+instance (StrictEq a, StrictEq b, StrictEq c, StrictEq d) => StrictEq (a, b, c, d)
+instance (StrictEq a, StrictEq b, StrictEq c, StrictEq d, StrictEq e) => StrictEq (a, b, c, d, e)
 instance (StrictEq a, StrictEq b) => StrictEq (Either a b)
 instance StrictEq a => StrictEq [a]
 instance StrictEq a => StrictEq (NE.NonEmpty a)
