@@ -3,6 +3,7 @@
 {-# language BlockArguments #-}
 {-# language ConstraintKinds #-}
 {-# language DataKinds #-}
+{-# language FlexibleContexts #-}
 {-# language FlexibleInstances #-}
 {-# language ImportQualifiedPost #-}
 {-# language IncoherentInstances #-}
@@ -28,6 +29,10 @@ module Data.Type.Constraint
   , refl
   , mapSing
   , unmapSing
+  , toMe
+  , fromMe
+  , No(..)
+  , fromNo
   -- Products
   , weaken1
   , weaken2
@@ -51,13 +56,14 @@ module Data.Type.Constraint
 
 import Control.Applicative
 import Control.Category
+import Data.Constraint ((:-)(..), Dict(..))
 import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.Kind
 import Data.List.NonEmpty qualified as NE
 import Data.Type.Internal
 import Data.Type.Internal.Instances
-import Data.Constraint ((:-)(..), Dict(..))
+import Data.Void
 import Prelude hiding (id,(.),(!!))
 import Type.Reflection
 
@@ -74,12 +80,28 @@ withDict :: forall q r. SingI @Constraint q => (q => r) -> r
 withDict r = case sing @_ @q of
   SConstraint -> r
 
-class (SingI p => SingI q) => p !=> q 
+class (SingI p => SingI q) => p !=> q
 instance (SingI p => SingI q) => p !=> q
 
 --eval :: '(p !=> q, p) !-> q
 --eval = unmapSing \case
 --  STuple2 f x -> _
+
+toMe :: Singular k => a !-> (Me::k)
+toMe = unmapSing \_ -> me
+
+fromMe :: forall i j (a::j) . Singular i => ((Me::i) !-> (a::j)) -> j
+fromMe f = fromSing $ mapSing f $ sing @i @Me
+
+class No k where
+  no :: k -> b
+
+instance No Void where
+  no = absurd
+
+-- ex-falso, which is probably dangerous in a lazy language
+fromNo :: forall k a b. No k => (a::k) !-> b
+fromNo = Subs $ no $ reflect @_ @a
 
 (!!) :: SingI p => (SingI q => r) -> (p !-> q) -> r
 r !! Subs sq = withSingI sq r
@@ -95,7 +117,7 @@ r \\ Subs sq = withSingI sq $ withDict @q r
 
 instance Category (!->) where
   id = Subs sing
-  f . g = Subs $ sing !! f !! g 
+  f . g = Subs $ sing !! f !! g
 
 -- note this is polykinded
 trans :: (b !-> c) -> (a !-> b) -> a !-> c
@@ -114,7 +136,7 @@ nohomo f = Subs $ case sing @_ @a of
     Sub Dict -> SConstraint
 
 mapSing :: (a !-> b) -> Sing a -> Sing b
-mapSing f s = withSingI s $ sing !! f 
+mapSing f s = withSingI s $ sing !! f
 
 unmapSing :: (Sing a -> Sing b) -> a !-> b
 unmapSing f = Subs (f sing)
@@ -123,7 +145,7 @@ mapSingC :: (a :- b) -> Sing a -> Sing b
 mapSingC = mapSing . nohomo
 
 unmapSingC :: (Sing a -> Sing b) -> a :- b
-unmapSingC = homo . unmapSing 
+unmapSingC = homo . unmapSing
 
 fromC :: forall a b. (a => Sing b) -> a !-> b
 fromC b = Subs $ case sing @_ @a of
@@ -137,7 +159,7 @@ weaken2 :: '(a,b) !-> b
 weaken2 = unmapSing \case
   STuple2 _ b -> b
 
-class (a, b) => a & b 
+class (a, b) => a & b
 instance (a, b) => a & b
 
 weakenC1 :: a&b !-> a
@@ -147,9 +169,9 @@ weakenC2 :: a&b !-> b
 weakenC2 = fromC SConstraint
 
 weakenT1 :: forall (a::Type) (b::Type). (a,b) !-> a
-weakenT1 = unmapSing \case 
+weakenT1 = unmapSing \case
   SType (App (App _ a) _) -> SType a
-  
+
 weakenT2 :: forall (a::Type) (b::Type). (a,b) !-> b
 weakenT2 = unmapSing \case
   SType (App _ b) -> SType b
@@ -157,7 +179,7 @@ weakenT2 = unmapSing \case
 stypeRep :: forall (a :: Type). Typeable a !-> a
 stypeRep = fromC $ SType $ typeRep @a
 
--- template haskell should be able to readily derive SFunctor 
+-- template haskell should be able to readily derive SFunctor
 -- and SBifunctor for each pattern it builds of sufficient arity
 
 type SFunctor :: (i -> j) -> Constraint
@@ -230,6 +252,6 @@ instance SBifunctor (&) where
 
 instance SBifunctor (f :: Type -> Type -> Type) where
   sbimap f g = unmapSing \case
-    SType (App (App t a) c) -> SType $ App 
+    SType (App (App t a) c) -> SType $ App
       (App t case mapSing f (SType a) of SType b -> b)
              case mapSing g (SType c) of SType d -> d
