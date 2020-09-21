@@ -235,7 +235,7 @@ pattern Nat n <- (fromNat -> n) where
 -- make our own 'Nat' type.
 -----------------------------------------------------------------------------
 
-pattern Z :: Integral a => a  
+pattern Z :: Integral a => a
 pattern Z = 0
 
 pattern S :: Integral a => a -> a
@@ -261,13 +261,13 @@ data family S' :: k -> k
 
 type Z :: forall k. k
 type family Z :: k where
-  Z = 0 -- for builtin nats
-  Z = Z'
+  Z = 0
+  Z = Z''
 
 type S :: forall k. k -> k
 type family S (n::k) :: k where
-  S n = 1 + n -- for builtin nats
-  S n = S' n
+  S n = 1 + n
+  S n = S'' n
 
 type SIntegral' :: forall k. k -> Type
 data SIntegral' (n :: k) where
@@ -278,7 +278,13 @@ upSIntegral :: forall k (n::k). Nice k => Sing n -> SIntegral' n
 upSIntegral (UnsafeSing 0) = unsafeCoerce SZ'
 upSIntegral (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
 
-class Integral a => Nice a
+class Integral a => Nice a where
+  type Z'' :: a
+  type Z'' = Z'
+
+  type S'' :: a -> a
+  type S'' = S'
+
 instance Nice Natural -- When GHC makes 'Natural' = 'Nat' this will not be 'Nice'
 instance Nice Int
 instance Nice Int8
@@ -296,15 +302,15 @@ instance Nice Integer -- Not everything can be reached by @S@, the complete prag
 
 -- instance Nice Nat -- 'Nat' is not 'Nice'.
 
-pattern SZ 
-  :: forall k (n::k). Nice k 
+pattern SZ
+  :: forall k (n::k). Nice k
   => n ~ Z' => Sing n
 pattern SZ <- (upSIntegral -> SZ') where
   SZ = UnsafeSing 0
 
-pattern SS 
-  :: forall k (n::k). Nice k 
-  => forall (n'::k). n ~ S' n' 
+pattern SS
+  :: forall k (n::k). Nice k
+  => forall (n'::k). n ~ S' n'
   => Sing n' -> Sing n
 pattern SS n <- (upSIntegral -> SS' n) where
   SS (Sing n) = UnsafeSing $ S n
