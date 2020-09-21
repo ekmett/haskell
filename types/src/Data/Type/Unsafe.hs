@@ -11,8 +11,8 @@ module Data.Type.Unsafe
   ( Sing(..)
   , FromPtr
   , FromWordPtr
-  , Z'
-  , S'
+  , MkZ
+  , MkS
   ) where
 
 import Data.Type.Internal

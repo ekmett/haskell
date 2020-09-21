@@ -27,6 +27,8 @@
 {-# language ViewPatterns #-}
 {-# language Unsafe #-}
 {-# language UndecidableInstances #-}
+{-# language TemplateHaskell #-}
+{-# language ImportQualifiedPost #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -47,6 +49,7 @@ import Data.Int
 import Data.Kind
 import Data.Proxy
 import Data.Some
+import Data.Traversable
 import Data.Type.Equality
 import Data.Word
 import Foreign.Ptr
@@ -58,6 +61,7 @@ import Numeric.Natural
 import Text.Read hiding (Symbol)
 import Type.Reflection
 import Unsafe.Coerce
+import Language.Haskell.TH qualified as TH
 
 --------------------------------------------------------------------------------
 -- * Singletons
@@ -256,18 +260,20 @@ pattern S n <- ((\case 0 -> Nothing; n -> Just $ n-1) -> Just n)
 {-# complete Z, S :: Word64 #-}
 {-# complete Z, S :: WordPtr #-}
 
-data family Z' :: k
-data family S' :: k -> k
+data family MkZ k :: k
+data family MkS k :: k -> k
 
+-- allows Z and S for Nat and any Nice kind
 type Z :: forall k. k
 type family Z :: k where
   Z = 0
-  Z = Z''
+  Z = Z'
 
+-- allows Z and S for Nat and any Nice kind
 type S :: forall k. k -> k
 type family S (n::k) :: k where
   S n = 1 + n
-  S n = S'' n
+  S n = S' n
 
 type SIntegral' :: forall k. k -> Type
 data SIntegral' (n :: k) where
@@ -278,29 +284,21 @@ upSIntegral :: forall k (n::k). Nice k => Sing n -> SIntegral' n
 upSIntegral (UnsafeSing 0) = unsafeCoerce SZ'
 upSIntegral (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
 
-class Integral a => Nice a where
-  type Z'' :: a
-  type Z'' = Z'
+class (Integral a, Z ~ MkZ a, Z' ~ MkZ a, S' ~ MkS a) => Nice a where
+  type Z' :: a
+  type S' :: a -> a
 
-  type S'' :: a -> a
-  type S'' = S'
+concat <$> for
+  [ ''Natural -- when GHC makes 'Natural' = 'Nat' this will not be 'Nice'
+  , ''Integer
+  , ''Int, ''Int8, ''Int16, ''Int32, ''Int64, ''IntPtr
+  , ''Word, ''Word8, ''Word16, ''Word32, ''Word64, ''WordPtr
+  ] \(TH.conT -> n) ->
+  [d|instance Nice $(n) where
+       type Z' = MkZ $(n)
+       type S' = MkS $(n) |]
 
-instance Nice Natural -- When GHC makes 'Natural' = 'Nat' this will not be 'Nice'
-instance Nice Int
-instance Nice Int8
-instance Nice Int16
-instance Nice Int32
-instance Nice Int64
-instance Nice IntPtr
-instance Nice Word
-instance Nice Word8
-instance Nice Word16
-instance Nice Word32
-instance Nice Word64
-instance Nice WordPtr
-instance Nice Integer -- Not everything can be reached by @S@, the complete pragma lies
-
--- instance Nice Nat -- 'Nat' is not 'Nice'.
+-- instance Nice Nat -- 'Nat' is decidedly not 'Nice'.
 
 pattern SZ
   :: forall k (n::k). Nice k
@@ -317,10 +315,10 @@ pattern SS n <- (upSIntegral -> SS' n) where
 
 {-# complete SS, SZ #-}
 
-instance forall k (a::k). (Nice k, SingI a) => SingI (S' a) where
+instance forall k (a::k). (Nice k, SingI a) => SingI (MkS k a) where
   sing = SS sing
 
-instance Nice k => SingI (Z'::k) where
+instance forall k. Nice k => SingI (MkZ k) where
   sing = SZ
 
 --------------------------------------------------------------------------------
