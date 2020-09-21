@@ -228,34 +228,8 @@ pattern Nat n <- (fromNat -> n) where
 
 {-# complete Nat #-}
 
-type SNat' :: Nat -> Type
-data SNat' (n :: Nat) where
-  SNatZ' :: SNat' Z
-  SNatS' :: Sing n -> SNat' (S n)
-
-upSNat :: Sing n -> SNat' n
-upSNat (UnsafeSing 0) = unsafeCoerce SNatZ'
-upSNat (UnsafeSing n) = unsafeCoerce $ SNatS' (UnsafeSing (n-1))
-
-pattern SNatZ :: forall (n::Nat). () => n ~ Z => Sing n
-pattern SNatZ <- (upSNat -> SNatZ') where
-  SNatZ = UnsafeSing 0
-
-pattern SNatS :: forall (n::Nat). () => forall (n'::Nat). n ~ S n' => Sing n' -> Sing n
-pattern SNatS n <- (upSNat -> SNatS' n) where
-  SNatS (Sing n) = UnsafeSing (S n)
-
-{-# complete SNatS, SNatZ #-}
-
 -----------------------------------------------------------------------------
--- * Lifting Natural
---
--- Unlike 'Nat' we can provide an injective 'S' here
--- Unfortunately we don't get a nice syntax for huge numeric
--- literals, so uh, don't use this for that. Use 'Nat'.
---
--- When GHC releases a version with 'Nat' = 'Natural', we'll just
--- make our own 'Nat' type.
+-- * Integral types
 -----------------------------------------------------------------------------
 
 pattern Z :: Integral a => a
@@ -266,6 +240,7 @@ pattern S n <- ((\case 0 -> Nothing; n -> Just $ n-1) -> Just n)
   where S n = n+1
 
 {-# complete Z, S :: Natural #-}
+{-# complete Z, S :: Nat #-}
 {-# complete Z, S :: Int #-}
 {-# complete Z, S :: Int8 #-}
 {-# complete Z, S :: Int16 #-}
@@ -282,30 +257,20 @@ pattern S n <- ((\case 0 -> Nothing; n -> Just $ n-1) -> Just n)
 data family MkZ k :: k
 data family MkS k :: k -> k
 
--- allows Z and S for Nat and any Nice kind
+class (Integral a, (Z::a) ~ NiceZ) => Nice a where
+  type NiceZ :: a
+  type NiceS :: a -> a
+  sinj :: forall (n::a). Proxy# n -> S n :~: NiceS n
+
 type Z :: forall k. k
 type family Z :: k where
   Z = 0
   Z = NiceZ
 
--- allows Z and S for Nat and any Nice kind
 type S :: forall k. k -> k
 type family S (n::k) :: k where
   S n = 1 + n
   S n = NiceS n
-
-type SNice' :: forall k. k -> Type
-data SNice' (n :: k) where
-  SZ' :: SNice' NiceZ
-  SS' :: Sing (n :: k) -> SNice' (NiceS n :: k)
-
-upSNice :: forall k (n::k). Nice k => Sing n -> SNice' n
-upSNice (UnsafeSing 0) = unsafeCoerce SZ'
-upSNice (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
-
-class (Integral a, Z ~ MkZ a, NiceZ ~ MkZ a, NiceS ~ MkS a) => Nice a where
-  type NiceZ :: a
-  type NiceS :: a -> a
 
 concat <$> for
   [ ''Natural -- when GHC makes 'Natural' = 'Nat' this will not be 'Nice'
@@ -315,30 +280,49 @@ concat <$> for
   ] \(TH.conT -> n) ->
   [d|instance Nice $(n) where
        type NiceZ = MkZ $(n)
-       type NiceS = MkS $(n) |]
+       type NiceS = MkS $(n)
+       sinj _ = Refl |]
 
--- instance Nice Nat -- 'Nat' is decidedly not 'Nice'.
 
-pattern SZ
-  :: forall k (n::k). Nice k
-  => n ~ NiceZ => Sing n
-pattern SZ <- (upSNice -> SZ') where
+type SIntegral' :: forall a. a -> Type
+data SIntegral' (n :: a) where
+  SZ' :: SIntegral' Z
+  SS' :: Sing n -> SIntegral' (S n)
+
+upSIntegral :: forall a (n::a). Integral a => Sing n -> SIntegral' n
+upSIntegral (UnsafeSing 0) = unsafeCoerce SZ'
+upSIntegral (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
+
+-- shared for both injective types and for Nat
+
+pattern SZ :: forall a (n::a). Integral a => n ~ Z => Sing n
+pattern SZ <- (upSIntegral -> SZ') where
   SZ = UnsafeSing 0
 
-pattern SS
-  :: forall k (n::k). Nice k
-  => forall (n'::k). n ~ NiceS n'
-  => Sing n' -> Sing n
-pattern SS n <- (upSNice -> SS' n) where
-  SS (Sing n) = UnsafeSing $ S n
+pattern SS :: forall a (n::a). Integral a => forall (n'::a). n ~ S n' => Sing n' -> Sing n
+pattern SS n <- (upSIntegral -> SS' n) where
+  SS (Sing n) = UnsafeSing (S n)
 
 {-# complete SS, SZ #-}
 
-instance forall k (a::k). (Nice k, SingI a) => SingI (MkS k a) where
-  sing = SS sing
+instance forall a (n::a). (Nice a, NiceS ~ MkS a, SingI n) => SingI (MkS a n) where
+  sing = case sinj (proxy# @n) of
+    Refl -> SS (sing @a @n)
 
-instance forall k. Nice k => SingI (MkZ k) where
+instance forall a. (Integral a, Z ~ MkZ a) => SingI (MkZ a) where
   sing = SZ
+
+-----------------------------------------------------------------------------
+-- * Lifting Natural
+--
+-- Unlike 'Nat' we can provide an injective 'S' here
+-- Unfortunately we don't get a nice syntax for huge numeric
+-- literals, so uh, don't use this for that. Use 'Nat'.
+--
+-- When GHC releases a version with 'Nat' = 'Natural', we'll just
+-- make our own 'Nat' type.
+-----------------------------------------------------------------------------
+
 
 --------------------------------------------------------------------------------
 -- * Lifting (Ptr a)

@@ -13,7 +13,9 @@ module Data.Type.Unsafe
   , FromWordPtr
   , MkZ
   , MkS
+  , makeNice
   ) where
 
 import Data.Type.Internal
+import Data.Type.Internal.TH
 import Data.Type ()

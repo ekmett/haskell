@@ -1,7 +1,8 @@
 {-# Language LambdaCase #-}
-{-# Language TemplateHaskellQuotes #-}
 {-# Language RecordWildCards #-}
 {-# Language ViewPatterns #-}
+{-# Language TemplateHaskell #-}
+{-# Language QuasiQuotes #-}
 {-# Language BlockArguments #-}
 {-# Language ParallelListComp #-}
 {-# Language ImportQualifiedPost #-}
@@ -19,6 +20,7 @@
 
 module Data.Type.Internal.TH
   ( SingRules(..)
+  , makeNice
   , makeSing
   , makeSingWith
   , defaultSingRules
@@ -166,7 +168,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     -- instance SingI a => SingI ('Left a) where sing = SLeft sing
     makeSingI :: Con -> Q [Dec]
     makeSingI = \case
-      NormalC n (length -> d) -> pure <$> makeSingI' d n 
+      NormalC n (length -> d) -> pure <$> makeSingI' d n
       RecC n (length -> d) -> pure <$> makeSingI' d n
       GadtC ns (length -> d) _ -> traverse (makeSingI' d) ns
       RecGadtC ns (length -> d) _ -> traverse (makeSingI' d) ns
@@ -177,13 +179,13 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     makeSingI' :: Int -> Name -> Q Dec
     makeSingI' d n = do
       ts <- fmap varT <$> fresh d
-      instanceD 
+      instanceD
         (traverse (appT $ conT ''SingI) ts)
         (appT csingi $ foldl appT (promotedT n) ts)
-        [ valD (varP 'sing) 
+        [ valD (varP 'sing)
                (normalB $ foldl (\l _ -> appE l (varE 'sing)) (conE $ singDataCon n) ts)
                []
-        ] 
+        ]
 
 {-
     makeSingI :: Con -> Q [Dec]
@@ -283,3 +285,9 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
         ForallC _ _ c -> go c
         InfixC _ n _ -> [n]
 
+makeNice :: Type -> Q [Dec]
+makeNice (pure -> t) =
+  [d|instance Nice $(t) where
+       type NiceS = MkS $(t)
+       type NiceZ = MkZ $(t)
+       sinj _ = Refl |]
