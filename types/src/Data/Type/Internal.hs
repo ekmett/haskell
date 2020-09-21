@@ -85,6 +85,8 @@ instance StrictEq a => StrictEq (Const a b)
 instance StrictEq Bool
 instance StrictEq ()
 instance StrictEq Void
+instance StrictEq (Dict p)
+instance StrictEq (p :- q)
 instance StrictEq Ordering
 instance StrictEq a => StrictEq (Maybe a)
 instance (StrictEq a, StrictEq b) => StrictEq (a, b)
