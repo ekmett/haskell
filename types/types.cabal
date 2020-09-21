@@ -81,7 +81,7 @@ library
   if flag(injectiveSucc)
     cpp-options: -DINJECTIVE_SUCC=1
   exposed-modules: 
-    Data.Eq.Structural
+    Data.Eq.Strict
     Data.Type
     Data.Type.Unsafe
     Data.Type.TH

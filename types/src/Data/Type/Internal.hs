@@ -73,24 +73,24 @@ import Language.Haskell.TH qualified as TH
 -- @
 -- x '==' y ==> f x '==' f y
 -- @
-class Eq a => SEq a
-instance SEq (MVar a)
-instance SEq (IORef a)
-instance SEq (STRef s a)
-instance SEq (Proxy a)
-instance SEq ThreadId
-instance SEq a => SEq (Const a b)
-instance SEq Bool
-instance SEq ()
-instance SEq Void
-instance SEq Ordering
-instance SEq a => SEq (Maybe a)
-instance (SEq a, SEq b) => SEq (a, b)
-instance (SEq a, SEq b) => SEq (Either a b)
-instance SEq a => SEq [a]
-instance SEq a => SEq (NE.NonEmpty a)
-instance SEq (Ptr a)
-instance SEq (StablePtr a)
+class Eq a => StrictEq a
+instance StrictEq (MVar a)
+instance StrictEq (IORef a)
+instance StrictEq (STRef s a)
+instance StrictEq (Proxy a)
+instance StrictEq ThreadId
+instance StrictEq a => StrictEq (Const a b)
+instance StrictEq Bool
+instance StrictEq ()
+instance StrictEq Void
+instance StrictEq Ordering
+instance StrictEq a => StrictEq (Maybe a)
+instance (StrictEq a, StrictEq b) => StrictEq (a, b)
+instance (StrictEq a, StrictEq b) => StrictEq (Either a b)
+instance StrictEq a => StrictEq [a]
+instance StrictEq a => StrictEq (NE.NonEmpty a)
+instance StrictEq (Ptr a)
+instance StrictEq (StablePtr a)
 
 --------------------------------------------------------------------------------
 -- * Singletons
@@ -114,10 +114,10 @@ instance Eq (Sing a) where
 instance Ord (Sing a) where
   compare _ _ = EQ
 
-instance SEq (Sing a)
+instance StrictEq (Sing a)
 
 -- assumes equality is structural.
-instance SEq k => TestEquality (Sing :: k -> Type) where
+instance StrictEq k => TestEquality (Sing :: k -> Type) where
   testEquality i j
     | fromSing i == fromSing j = Just (unsafeCoerce Refl)
     | otherwise = Nothing
