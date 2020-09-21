@@ -267,26 +267,26 @@ data family MkS k :: k -> k
 type Z :: forall k. k
 type family Z :: k where
   Z = 0
-  Z = Z'
+  Z = NiceZ
 
 -- allows Z and S for Nat and any Nice kind
 type S :: forall k. k -> k
 type family S (n::k) :: k where
   S n = 1 + n
-  S n = S' n
+  S n = NiceS n
 
-type SIntegral' :: forall k. k -> Type
-data SIntegral' (n :: k) where
-  SZ' :: SIntegral' Z'
-  SS' :: Sing (n :: k) -> SIntegral' (S' n :: k)
+type SNice' :: forall k. k -> Type
+data SNice' (n :: k) where
+  SZ' :: SNice' NiceZ
+  SS' :: Sing (n :: k) -> SNice' (NiceS n :: k)
 
-upSIntegral :: forall k (n::k). Nice k => Sing n -> SIntegral' n
-upSIntegral (UnsafeSing 0) = unsafeCoerce SZ'
-upSIntegral (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
+upSNice :: forall k (n::k). Nice k => Sing n -> SNice' n
+upSNice (UnsafeSing 0) = unsafeCoerce SZ'
+upSNice (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
 
-class (Integral a, Z ~ MkZ a, Z' ~ MkZ a, S' ~ MkS a) => Nice a where
-  type Z' :: a
-  type S' :: a -> a
+class (Integral a, Z ~ MkZ a, NiceZ ~ MkZ a, NiceS ~ MkS a) => Nice a where
+  type NiceZ :: a
+  type NiceS :: a -> a
 
 concat <$> for
   [ ''Natural -- when GHC makes 'Natural' = 'Nat' this will not be 'Nice'
@@ -295,22 +295,22 @@ concat <$> for
   , ''Word, ''Word8, ''Word16, ''Word32, ''Word64, ''WordPtr
   ] \(TH.conT -> n) ->
   [d|instance Nice $(n) where
-       type Z' = MkZ $(n)
-       type S' = MkS $(n) |]
+       type NiceZ = MkZ $(n)
+       type NiceS = MkS $(n) |]
 
 -- instance Nice Nat -- 'Nat' is decidedly not 'Nice'.
 
 pattern SZ
   :: forall k (n::k). Nice k
-  => n ~ Z' => Sing n
-pattern SZ <- (upSIntegral -> SZ') where
+  => n ~ NiceZ => Sing n
+pattern SZ <- (upSNice -> SZ') where
   SZ = UnsafeSing 0
 
 pattern SS
   :: forall k (n::k). Nice k
-  => forall (n'::k). n ~ S' n'
+  => forall (n'::k). n ~ NiceS n'
   => Sing n' -> Sing n
-pattern SS n <- (upSIntegral -> SS' n) where
+pattern SS n <- (upSNice -> SS' n) where
   SS (Sing n) = UnsafeSing $ S n
 
 {-# complete SS, SZ #-}

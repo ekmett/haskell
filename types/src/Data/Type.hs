@@ -45,7 +45,7 @@ module Data.Type
   , toSymbol
   , fromSymbol
   -- * Lifting numerics
-  , Nice
+  , Nice(..)
   , pattern Z
   , pattern S
   , type S
