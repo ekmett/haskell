@@ -44,8 +44,10 @@ import Control.Applicative
 import Control.Concurrent
 import Data.Constraint
 import Data.Function
+import Data.GADT.Compare
 import Data.IORef
 import Data.Int
+import Data.Hashable
 import Data.Kind
 import Data.List.NonEmpty qualified as NE
 import Data.Proxy
@@ -75,6 +77,8 @@ import Unsafe.Coerce
 -- @
 -- x '==' y ==> f x '==' f y
 -- @
+type StrictEq :: Type -> Constraint
+type role StrictEq nominal
 class Eq a => StrictEq a
 instance StrictEq (MVar a)
 instance StrictEq (IORef a)
@@ -97,6 +101,8 @@ instance (StrictEq a, StrictEq b) => StrictEq (Either a b)
 instance StrictEq a => StrictEq [a]
 instance StrictEq a => StrictEq (NE.NonEmpty a)
 instance StrictEq (Ptr a)
+instance StrictEq Symbol
+instance StrictEq Nat
 instance StrictEq (StablePtr a)
 
 --------------------------------------------------------------------------------
@@ -106,6 +112,7 @@ instance StrictEq (StablePtr a)
 type Sing :: forall k. k -> Type
 type role Sing nominal
 newtype Sing (a :: k) = SING { fromSing :: k }
+  deriving Hashable
 
 instance (Typeable k, Show k) => Show (Sing (a :: k)) where
   showsPrec d (Sing k) = showParen (d > 10) $
@@ -124,10 +131,13 @@ instance Ord (Sing a) where
 
 instance StrictEq (Sing a)
 
+instance StrictEq k => GEq (Sing @k) where
+  geq = testEquality
+
 -- assumes equality is structural.
 instance StrictEq k => TestEquality (Sing :: k -> Type) where
-  testEquality i j
-    | fromSing i == fromSing j = Just (unsafeCoerce Refl)
+  testEquality (Sing i) (Sing j)
+    | i == j = Just (unsafeCoerce Refl)
     | otherwise = Nothing
 
 --------------------------------------------------------------------------------
@@ -211,6 +221,11 @@ fromType = unsafeCoerce
 
 instance Show Type where
   showsPrec d (Type t) = showsPrec d t
+
+instance Eq Type where
+  (==) = (==) `on` fromType
+
+instance StrictEq Type
 
 pattern Type :: TypeRep (a :: Type) -> Type
 pattern Type t <- (fromType -> Some t) where
@@ -387,35 +402,35 @@ instance forall a. (Integral a, Z ~ Z# a) => SingI (Z# a) where
 -- * Lifting Dict and types that are otherwise singleton
 --------------------------------------------------------------------------------
 
--- used to fill in 'It' when the singular term can't be lifted
-data family It# :: k
-type family It :: k
-type instance It = 'SING It
-type instance It = '()
-type instance It = 'Proxy
-type instance It = 'Const It
-type instance It = '(It,It)
-type instance It = '(It,It,It)
-type instance It = '(It,It,It,It)
-type instance It = '(It,It,It,It,It)
-type instance It = '(It,It,It,It,It,It)
-type instance It = '(It,It,It,It,It,It,It)
-type instance It = '(It,It,It,It,It,It,It,It)
-type instance It = '(It,It,It,It,It,It,It,It,It)
-type instance It = 'Refl
-type instance It = 'HRefl
-type instance It = It# :: Dict p
-type instance It = It# :: p :- q
+-- used to fill in 'Me' when the singular term can't be lifted
+data family Me# :: k
+type family Me :: k
+type instance Me = 'SING Me
+type instance Me = '()
+type instance Me = 'Proxy
+type instance Me = 'Const Me
+type instance Me = '(Me,Me)
+type instance Me = '(Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me,Me,Me,Me)
+type instance Me = 'Refl
+type instance Me = 'HRefl
+type instance Me = Me# :: Dict p
+type instance Me = Me# :: p :- q
 
-type Singular k = SingI (It :: k)
+type Singular k = SingI @k Me
 
-it :: forall k. Singular k => k
-it = reflect @k @It
+me :: forall k. Singular k => k
+me = reflect @k @Me
 
-instance p => SingI (It# :: Dict p) where
+instance p => SingI (Me# :: Dict p) where
   sing = SING Dict
 
-instance (p => q) => SingI (It# :: (p :- q)) where
+instance (p => q) => SingI (Me# :: (p :- q)) where
   sing = SING (Sub Dict)
 
 --------------------------------------------------------------------------------

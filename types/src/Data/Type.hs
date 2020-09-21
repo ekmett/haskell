@@ -31,8 +31,8 @@ module Data.Type
   -- * Lowering kinds to types
   , reflect
   , Singular
-  , it
-  , It
+  , me
+  , Me
   -- ** 'Type'
   , type Type
   , pattern Type

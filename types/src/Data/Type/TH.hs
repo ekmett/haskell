@@ -3,6 +3,7 @@ module Data.Type.TH
   , makeSing
   , makeSingWith
   , defaultSingRules
+  , makeNice
   ) where
 
 import Data.Type.Internal.TH

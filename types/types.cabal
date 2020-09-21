@@ -13,9 +13,25 @@ description:
   including types like 'Int' and 'Char'.
   .
   However, this also exposes a need to "lower" certain previously uninhabited 
-  kinds to the type level, in a way that they can have terms in them.
-  So we make the built-in kinds for 'Nat', 'Symbol', and 'Type' behave like
-  other types, with meaningful values in them when lowered to the type level.
+  kinds to the type level, in a way that they can have terms in them. To this
+  end, this package gives the built-in kinds for 'Nat', 'Symbol', 'Constraint'
+  and 'Type' useful behavior when used as types of terms.
+  .
+  'Nat' acts like 'Natural'. There is utility to keeping both kinds, however.
+  'S' is not injective for 'Nat', while it is for all the other numeric kinds
+  offered by this package. On the other hand, large terms constructed directly
+  out of syntax in 'Nat' can be more efficient than the linear time walk used
+  to build a SingI for 'Natural' from syntax.
+  .
+  'Constraint' acts as a dictionary. @'Sing' (a :: 'Constraint') subsumes the
+  usual 'Dict' type.
+  .
+  'Type' acts as a 'Data.Typeable.TypeRep', while 'Sing (a :: Type) acts like
+  the safer 'Type.Reflection.TypeRep'.
+  .
+  'Symbol' can be used directly as a string type. Because we can promote 'Char'.
+  'String' can be used at the kind level as well, giving a more flexible 'Symbol'
+  type.
 
 homepage: https://github.com/ekmett/haskell
 license: BSD-2-Clause OR Apache-2.0
@@ -64,6 +80,7 @@ common base
     constraints,
     containers,
     ghc-prim,
+    hashable,
     template-haskell,
     ghc-typelits-natnormalise
   ghc-options:
