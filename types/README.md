@@ -2,12 +2,21 @@ types
 =====
 
 This library provides a very fast notion of singleton types, a la `singletons`. The cost difference is
-/O(1)/ vs /O(n)/ in the size of the term being lifted to the type level to perform a round-trip.
+*O(1)* vs *O(n)* in the size of the term being lifted to the type level to perform a round-trip.
 
-In addition, it uses various tricks to make `Type` look like `TypeRep`, allow `Nat` to look like `Natural`, 
-`Symbol` look like `String`. This makes makes working with singleton types much more uniform.
+In addition, it uses various tricks to lower multiple kinds that previously did not have a term representation:
 
-Finally, we allow lifting additional types, like `Int` and `Char` to the type level.
+* `Type` look like `Data.Typeable.TypeRep`, while `Sing (a :: Type)` is effectively `Type.Reflection.TypeRep`
+
+* `Constraint` look like an existentially quantified dictionary, while `Sing (a :: Constraint)` matches `Dict a`
+
+* `Nat` can be used like `Natural`
+
+* `Symbol` looks like `String`.
+
+This makes makes working with singleton types much more uniform.
+
+Finally, we allow lifting additional types, like `Int` and `Char`, even `Ptr` to the type level.
 
 This makes type level programming and "mildly-dependent" Haskell much more uniform to work with
 and avoid compromising efficiency.
