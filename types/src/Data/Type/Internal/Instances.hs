@@ -8,6 +8,7 @@
 {-# language PolyKinds #-}
 {-# language RoleAnnotations #-}
 {-# language ViewPatterns #-}
+{-# language UndecidableInstances #-}
 {-# language GADTs #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_HADDOCK not-home #-}

@@ -4,6 +4,7 @@
 {-# language StandaloneKindSignatures #-}
 {-# language FlexibleInstances #-}
 {-# language DataKinds #-}
+{-# language TypeApplications #-}
 {-# language PolyKinds #-}
 {-# language RoleAnnotations #-}
 {-# language ViewPatterns #-}
@@ -27,9 +28,11 @@ module Data.Type
   , makeSing
   -- * Reifying terms and constraints into singletons
   , SingI(..)
-  , ify , reify
-  -- * Lowering kinds to types
+  , withSingI
+  -- * Reflection
+  , reify
   , reflect
+  -- * Singular types
   , Singular
   , me
   , Me

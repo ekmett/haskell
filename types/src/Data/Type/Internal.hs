@@ -151,7 +151,7 @@ instance StrictEq k => TestEquality (Sing @k) where
 --------------------------------------------------------------------------------
 
 type SingI :: forall k. k -> Constraint
-class SingI (a :: k) where
+class SingI a where
   sing :: Sing a
 
 -- bootstrapping singleton singletons
@@ -161,20 +161,20 @@ instance SingI k => SingI @(Sing k) ('SING a) where
 type Wrap :: forall k. k -> Type -> Type
 #ifdef USE_MAGICDICT
 data Wrap s r = Wrap (SingI s => Proxy# s -> r)
-ify# :: (SingI a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
-ify# f x y = magicDict (Wrap f) x y
+withSingI# :: (SingI a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
+withSingI# f x y = magicDict (Wrap f) x y
 #else
 newtype Wrap s r = Wrap (SingI s => Proxy# s -> r)
-ify# :: (SingI a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
-ify# f x y = unsafeCoerce (Wrap f) x y
-{-# inline ify# #-}
+withSingI# :: (SingI a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
+withSingI# f x y = unsafeCoerce (Wrap f) x y
+{-# inline withSingI# #-}
 #endif
 
-ify :: Sing a -> (SingI a => r) -> r
-ify s r = ify# (\_ -> r) s proxy#
+withSingI :: Sing a -> (SingI a => r) -> r
+withSingI s r = withSingI# (\_ -> r) s proxy#
 
 reify :: k -> (forall (a::k). SingI a => Proxy# a -> r) -> r
-reify k f = ify# f (SING k) proxy#
+reify k f = withSingI# f (SING k) proxy#
 
 reflect :: forall k (a::k). SingI a => k
 reflect = fromSing (sing @k @a)
