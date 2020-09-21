@@ -37,7 +37,7 @@ flag dump
     Dump splices
 
 flag injectiveSucc
-  default: True
+  default: False
   manual: True
   description: Hack S for kind Nat to be injective.
 
@@ -63,7 +63,8 @@ common base
     base >= 4.14 && < 5,
     containers,
     ghc-prim,
-    template-haskell
+    template-haskell,
+    ghc-typelits-natnormalise
   ghc-options:
     -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates
     -Wredundant-constraints -Widentities

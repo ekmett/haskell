@@ -9,8 +9,10 @@
 
 module Data.Type.Unsafe
   ( Sing(..)
-  , FromNat
-  , FromSymbol
+  , FromPtr
+  , FromWordPtr
+  , Z'
+  , S'
   ) where
 
 import Data.Type.Internal

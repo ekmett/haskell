@@ -38,21 +38,20 @@ module Data.Type
   , Nat
   , toNat, fromNat
   , pattern Nat
-  , pattern Z
-  , pattern S
-  , type Z
-  , type S
-  , pattern SS
-  , pattern SZ
+  -- , pattern SNat
   -- ** 'Symbol'
   , Symbol
   , pattern Symbol
   , toSymbol
   , fromSymbol
-  -- * Lifting types to kinds
-  -- ** 'Int'
-  , MkInt
-  , pattern SIntS, pattern SIntZ, pattern SMkInt -- Int
+  -- * Lifting numerics
+  , Nice
+  , pattern Z
+  , pattern S
+  , type S
+  , type Z
+  , pattern SS
+  , pattern SZ
   -- ** 'Char'
   , MkChar
   -- ** @'Ptr' a@

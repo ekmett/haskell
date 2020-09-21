@@ -26,6 +26,7 @@
 {-# language TypeOperators #-}
 {-# language ViewPatterns #-}
 {-# language Unsafe #-}
+{-# language UndecidableInstances #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -40,13 +41,14 @@
 
 module Data.Type.Internal where
 
-import Control.Exception
 import Data.Eq.Structural
 import Data.Function
+import Data.Int
 import Data.Kind
 import Data.Proxy
 import Data.Some
 import Data.Type.Equality
+import Data.Word
 import Foreign.Ptr
 import Foreign.StablePtr
 import GHC.Exts
@@ -222,121 +224,114 @@ pattern Nat n <- (fromNat -> n) where
 
 {-# complete Nat #-}
 
-pattern Z :: Nat
-pattern Z = Nat 0
-
-safePred :: Natural -> Maybe Natural
-safePred 0 = Nothing
-safePred n = Just (n-1)
-
-pattern S :: Nat -> Nat
-pattern S n <- (safePred . fromNat -> Just (Nat -> n)) where
-  S n = Nat (fromNat n + 1)
-
-{-# complete Z, S #-}
-
-type Z :: Nat
-type Z = 0
-
--- | successor of a natural number
-#ifdef INJECTIVE_SUCC
-type S :: Nat -> Nat
-type S = S'
--- this works as long as you basically stick to using constants, zero and S to instantiate nats
--- and don't enable structural equality for it
-data family S' :: Nat -> k
-instance {-# OVERLAPPING #-} SingI a => SingI (S a) where sing = SS sing
-#else
-type S :: Nat -> Nat
-type S n = 1+n
-#endif
-
-type SNat' :: Nat -> Type
-data SNat' n where
-  SZ' :: SNat' Z
-  SS' :: Sing i -> SNat' (S i)
-
-upSNat :: Sing n -> SNat' n
-upSNat (UnsafeSing 0) = unsafeCoerce SZ'
-upSNat (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
-
--- |
--- This apparently trips a GHC bug, so you may have to use
--- -Wno-overlapping-patterns. Note the loss of type inference
--- from the "inaccessible" branch and the fact that it immediately
--- then gets executed
+-----------------------------------------------------------------------------
+-- * Lifting Natural
 --
--- @
--- ghci> case SS SZ of { SS SZ -> print "hi" } :: IO ()
--- <interactive>:77:17: warning: [-Woverlapping-patterns]
---    Pattern match has inaccessible right hand side
---    In a case alternative: SS SZ -> ...
--- "hi"
--- @
-pattern SZ :: () => n ~ Z => Sing n
-pattern SZ <- (upSNat -> SZ') where
+-- Unlike 'Nat' we can provide an injective 'S' here
+-- Unfortunately we don't get a nice syntax for huge numeric
+-- literals, so uh, don't use this for that. Use 'Nat'.
+--
+-- When GHC releases a version with 'Nat' = 'Natural', we'll just
+-- make our own 'Nat' type.
+-----------------------------------------------------------------------------
+
+pattern Z :: Integral a => a  
+pattern Z = 0
+
+pattern S :: Integral a => a -> a
+pattern S n <- ((\case 0 -> Nothing; n -> Just $ n-1) -> Just n)
+  where S n = n+1
+
+{-# complete Z, S :: Natural #-}
+{-# complete Z, S :: Int #-}
+{-# complete Z, S :: Int8 #-}
+{-# complete Z, S :: Int16 #-}
+{-# complete Z, S :: Int32 #-}
+{-# complete Z, S :: Int64 #-}
+{-# complete Z, S :: IntPtr #-}
+{-# complete Z, S :: Word #-}
+{-# complete Z, S :: Word8 #-}
+{-# complete Z, S :: Word16 #-}
+{-# complete Z, S :: Word32 #-}
+{-# complete Z, S :: Word64 #-}
+{-# complete Z, S :: WordPtr #-}
+
+data family Z' :: k
+data family S' :: k -> k
+
+type Z :: forall k. k
+type family Z :: k where
+  Z = 0 -- for builtin nats
+  Z = Z'
+
+type S :: forall k. k -> k
+type family S (n::k) :: k where
+  S n = 1 + n -- for builtin nats
+  S n = S' n
+
+type SIntegral' :: forall k. k -> Type
+data SIntegral' (n :: k) where
+  SZ' :: SIntegral' Z'
+  SS' :: Sing (n :: k) -> SIntegral' (S' n :: k)
+
+upSIntegral :: forall k (n::k). Nice k => Sing n -> SIntegral' n
+upSIntegral (UnsafeSing 0) = unsafeCoerce SZ'
+upSIntegral (UnsafeSing n) = unsafeCoerce $ SS' (UnsafeSing (n-1))
+
+class Integral a => Nice a
+instance Nice Natural -- When GHC makes 'Natural' = 'Nat' this will not be 'Nice'
+instance Nice Int
+instance Nice Int8
+instance Nice Int16
+instance Nice Int32
+instance Nice Int64
+instance Nice IntPtr
+instance Nice Word
+instance Nice Word8
+instance Nice Word16
+instance Nice Word32
+instance Nice Word64
+instance Nice WordPtr
+instance Nice Integer -- Not everything can be reached by @S@, the complete pragma lies
+
+-- instance Nice Nat -- 'Nat' is not 'Nice'.
+
+pattern SZ 
+  :: forall k (n::k). Nice k 
+  => n ~ Z' => Sing n
+pattern SZ <- (upSIntegral -> SZ') where
   SZ = UnsafeSing 0
 
-pattern SS :: () => m ~ S n => Sing n -> Sing m
-pattern SS n <- (upSNat -> SS' n) where
-  SS n = UnsafeSing $ succ $ fromSing n
+pattern SS 
+  :: forall k (n::k). Nice k 
+  => forall (n'::k). n ~ S' n' 
+  => Sing n' -> Sing n
+pattern SS n <- (upSIntegral -> SS' n) where
+  SS (Sing n) = UnsafeSing $ S n
 
 {-# complete SS, SZ #-}
 
---------------------------------------------------------------------------------
--- * Lifting Ints
---------------------------------------------------------------------------------
+instance forall k (a::k). (Nice k, SingI a) => SingI (S' a) where
+  sing = SS sing
 
-data family FromNat :: Nat -> k
-
-type MkInt :: Nat -> Int
-type MkInt = FromNat
-
-instance KnownNat n => SingI (MkInt n) where
-  sing = SMkInt $ UnsafeSing $ fromIntegral $ TL.natVal $ Proxy @n
-
-type SInt' :: Int -> Type
-data SInt' n where
-  SIntZ' :: SInt' (MkInt Z)
-  SIntS' :: Sing (MkInt i) -> SInt' (MkInt (S i))
-
-upSInt :: Sing n -> SInt' n
-upSInt (UnsafeSing 0) = unsafeCoerce SIntZ'
-upSInt (UnsafeSing n) = unsafeCoerce $ SIntS' (UnsafeSing (n-1))
-
-pattern SIntZ :: () => n ~ MkInt Z => Sing n
-pattern SIntZ <- (upSInt -> SIntZ') where
-  SIntZ = UnsafeSing 0
-
-pattern SIntS :: () => (i ~ MkInt i', j ~ MkInt (S i')) => Sing i -> Sing j
-pattern SIntS n <- (upSInt -> SIntS' n) where
-  SIntS n = UnsafeSing $ succ $ fromSing n
-
-{-# complete SIntS, SIntZ #-}
-
-pattern SMkInt :: Sing n -> Sing (MkInt n)
-pattern SMkInt n <- Sing (UnsafeSing . fromIntegral -> n) where
-  SMkInt n = if fromSing n > fromIntegral (maxBound @Word)
-             then throw Overflow
-             else UnsafeSing $ fromIntegral (fromSing n)
-
-{-# complete SMkInt #-}
+instance Nice k => SingI (Z'::k) where
+  sing = SZ
 
 --------------------------------------------------------------------------------
 -- * Lifting (Ptr a)
 --------------------------------------------------------------------------------
 
-type MkPtr :: forall a. Nat -> Ptr a
-type MkPtr = FromNat
+data family FromWordPtr :: WordPtr -> k
 
-instance KnownNat n => SingI (MkPtr n) where
+type MkPtr :: forall a. WordPtr -> Ptr a
+type MkPtr = FromWordPtr
+
+instance SingI n => SingI (MkPtr n) where
   sing = SMkPtr sing
 
 pattern SMkPtr :: Sing n -> Sing (MkPtr n)
-pattern SMkPtr n <- Sing (UnsafeSing . fromIntegral . ptrToWordPtr -> n) where
-  SMkPtr n = if fromSing n > fromIntegral (maxBound @WordPtr)
-             then throw Overflow
-             else UnsafeSing $ wordPtrToPtr $ fromIntegral (fromSing n)
+pattern SMkPtr n <- Sing (UnsafeSing . ptrToWordPtr -> n) where
+  SMkPtr (Sing n) = UnsafeSing $ wordPtrToPtr n
 
 {-# complete SMkPtr #-}
 
@@ -344,19 +339,17 @@ pattern SMkPtr n <- Sing (UnsafeSing . fromIntegral . ptrToWordPtr -> n) where
 -- * Lifting (StablePtr a)
 --------------------------------------------------------------------------------
 
-type MkStablePtr :: forall a. Nat -> StablePtr a
-type MkStablePtr = FromNat
+data family FromPtr :: Ptr a -> k
 
-instance KnownNat n => SingI (MkStablePtr n) where
+type MkStablePtr :: forall a. Ptr () -> StablePtr a
+type MkStablePtr = FromPtr
+
+instance SingI n => SingI (MkStablePtr n) where
   sing = SMkStablePtr sing
 
 pattern SMkStablePtr :: Sing n -> Sing (MkStablePtr n)
-pattern
-  SMkStablePtr n <- Sing (UnsafeSing . fromIntegral . ptrToWordPtr . castStablePtrToPtr -> n) where
-  SMkStablePtr n
-    = if fromSing n > fromIntegral (maxBound @WordPtr)
-    then throw Overflow
-    else UnsafeSing $ castPtrToStablePtr $ wordPtrToPtr $ fromIntegral (fromSing n)
+pattern SMkStablePtr n <- Sing (UnsafeSing . castStablePtrToPtr -> n) where
+  SMkStablePtr (Sing n) = UnsafeSing $ castPtrToStablePtr n
 
 {-# complete SMkStablePtr #-}
 
