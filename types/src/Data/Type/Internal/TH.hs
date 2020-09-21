@@ -2,6 +2,7 @@
 {-# Language RecordWildCards #-}
 {-# Language ViewPatterns #-}
 {-# Language TemplateHaskell #-}
+{-# Language MagicHash #-}
 {-# Language QuasiQuotes #-}
 {-# Language BlockArguments #-}
 {-# Language ParallelListComp #-}
@@ -254,8 +255,10 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
         InfixC _ n _ -> [n]
 
 makeNice :: Type -> Q [Dec]
-makeNice (pure -> t) =
+makeNice (pure -> t) = do
+  let s# = conT ''S#
+      z# = conT ''Z#
   [d|instance Nice $(t) where
-       type NiceS = MkS $(t)
-       type NiceZ = MkZ $(t)
+       type NiceS = $(s#) $(t)
+       type NiceZ = $(z#) $(t)
        sinj _ = Refl |]

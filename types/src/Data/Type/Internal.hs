@@ -7,6 +7,7 @@
 {-# language DerivingStrategies #-}
 {-# language EmptyCase #-}
 {-# language FlexibleInstances #-}
+{-# language FlexibleContexts #-}
 {-# language GADTs #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language ImportQualifiedPost #-}
@@ -41,13 +42,14 @@ module Data.Type.Internal where
 
 import Control.Applicative
 import Control.Concurrent
+import Data.Constraint
 import Data.Function
 import Data.IORef
-import Data.STRef
 import Data.Int
-import Data.List.NonEmpty qualified as NE
 import Data.Kind
+import Data.List.NonEmpty qualified as NE
 import Data.Proxy
+import Data.STRef
 import Data.Some
 import Data.Traversable
 import Data.Type.Equality
@@ -58,11 +60,11 @@ import Foreign.StablePtr
 import GHC.Exts
 import GHC.TypeLits as TL
 import GHC.TypeNats as TN
+import Language.Haskell.TH qualified as TH
 import Numeric.Natural
 import Text.Read hiding (Symbol)
 import Type.Reflection
 import Unsafe.Coerce
-import Language.Haskell.TH qualified as TH
 
 --------------------------------------------------------------------------------
 -- * Structural Equality
@@ -97,6 +99,7 @@ instance StrictEq (StablePtr a)
 --------------------------------------------------------------------------------
 
 type Sing :: forall k. k -> Type
+type role Sing nominal
 newtype Sing (a :: k) = SING { fromSing :: k }
 
 instance (Typeable k, Show k) => Show (Sing (a :: k)) where
@@ -282,8 +285,8 @@ pattern S n <- ((\case 0 -> Nothing; n -> Just $ n-1) -> Just n)
 {-# complete Z, S :: Word64 #-}
 {-# complete Z, S :: WordPtr #-}
 
-data family MkZ k :: k
-data family MkS k :: k -> k
+data family Z# k :: k
+data family S# k :: k -> k
 
 class (Integral a, (Z::a) ~ NiceZ) => Nice a where
   type NiceZ :: a
@@ -307,8 +310,8 @@ concat <$> for
   , ''Word, ''Word8, ''Word16, ''Word32, ''Word64, ''WordPtr
   ] \(TH.conT -> n) ->
   [d|instance Nice $(n) where
-       type NiceZ = MkZ $(n)
-       type NiceS = MkS $(n)
+       type NiceZ = Z# $(n)
+       type NiceS = S# $(n)
        sinj _ = Refl |]
 
 type SIntegral' :: forall a. a -> Type
@@ -332,21 +335,54 @@ pattern SS n <- (upSIntegral -> SS' n) where
 
 {-# complete SS, SZ #-}
 
-instance forall a (n::a). (Nice a, NiceS ~ MkS a, SingI n) => SingI (MkS a n) where
+instance forall a (n::a). (Nice a, NiceS ~ S# a, SingI n) => SingI (S# a n) where
   sing = case sinj (proxy# @n) of
     Refl -> SS (sing @a @n)
 
-instance forall a. (Integral a, Z ~ MkZ a) => SingI (MkZ a) where
+instance forall a. (Integral a, Z ~ Z# a) => SingI (Z# a) where
   sing = SZ
+
+--------------------------------------------------------------------------------
+-- * Lifting Dict and types that are otherwise singleton
+--------------------------------------------------------------------------------
+
+-- used to fill in 'The' when the singular term can't be lifted
+data family The# :: k
+
+type family The :: k
+
+type Singular k = SingI (The :: k)
+
+the :: forall a. Singular a => a
+the = reflect @a @The
+
+type instance The = The# :: Dict p
+instance p => SingI (The# :: Dict p) where
+  sing = SING Dict
+
+type instance The = The# :: p :- q
+instance (p => q) => SingI (The# :: (p :- q)) where
+  sing = SING (Sub Dict)
+
+{-
+type instance The = 'SING The :: Sing a
+instance SingI (a::k) => SingI ('SING a :: Sing k) where
+  sing = SING sing
+-}
+
+type instance The = '()
+instance SingI '() where sing = SING ()
+type instance The = '(The,The)
+
 
 --------------------------------------------------------------------------------
 -- * Lifting (Ptr a)
 --------------------------------------------------------------------------------
 
-data family FromWordPtr :: WordPtr -> k
+data family FromWordPtr# :: WordPtr -> k
 
 type MkPtr :: forall a. WordPtr -> Ptr a
-type MkPtr = FromWordPtr
+type MkPtr = FromWordPtr#
 
 instance SingI n => SingI (MkPtr n) where
   sing = SMkPtr sing
@@ -361,10 +397,10 @@ pattern SMkPtr n <- Sing (SING . ptrToWordPtr -> n) where
 -- * Lifting (StablePtr a)
 --------------------------------------------------------------------------------
 
-data family FromPtr :: Ptr a -> k
+data family FromPtr# :: Ptr a -> k
 
 type MkStablePtr :: forall a. Ptr () -> StablePtr a
-type MkStablePtr = FromPtr
+type MkStablePtr = FromPtr#
 
 instance SingI n => SingI (MkStablePtr n) where
   sing = SMkStablePtr sing

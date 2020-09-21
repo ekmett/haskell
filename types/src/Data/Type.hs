@@ -30,6 +30,7 @@ module Data.Type
   , Reifies, ify , reify
   -- * Lowering kinds to types
   , reflect
+  , Singular, The, the
   -- ** 'Type'
   , type Type
   , pattern Type

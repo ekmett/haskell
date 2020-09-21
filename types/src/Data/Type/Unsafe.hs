@@ -1,4 +1,5 @@
 {-# Language Unsafe #-}
+{-# Language MagicHash #-}
 
 -- |
 -- Copyright :  (c) Edward Kmett 2020
@@ -9,10 +10,11 @@
 
 module Data.Type.Unsafe
   ( Sing(..)
-  , FromPtr
-  , FromWordPtr
-  , MkZ
-  , MkS
+  , FromPtr#
+  , FromWordPtr#
+  , The#
+  , Z#
+  , S#
   , makeNice
   ) where
 
