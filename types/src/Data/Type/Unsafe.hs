@@ -12,7 +12,7 @@ module Data.Type.Unsafe
   ( Sing(..)
   , FromPtr#
   , FromWordPtr#
-  , The#
+  , It#
   , Z#
   , S#
   , makeNice
