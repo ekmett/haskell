@@ -142,8 +142,6 @@ class SingI (a :: k) where
 instance SingI k => SingI @(Sing k) ('SING a) where
   sing = SING sing
 
-type Reifies k (a::k) = SingI a
-
 type Wrap :: forall k. k -> Type -> Type
 #ifdef USE_MAGICDICT
 data Wrap s r = Wrap (SingI s => Proxy# s -> r)
@@ -162,7 +160,7 @@ ify s r = ify# (\_ -> r) s proxy#
 reify :: k -> (forall (a::k). SingI a => Proxy# a -> r) -> r
 reify k f = ify# f (SING k) proxy#
 
-reflect :: forall k a. Reifies k a => k
+reflect :: forall k (a::k). SingI a => k
 reflect = fromSing (sing @k @a)
 
 --------------------------------------------------------------------------------
@@ -202,7 +200,7 @@ pattern SType t <- (upSType -> SType' t) where
 -- * Lowering Nats
 --------------------------------------------------------------------------------
 
-instance {-# OVERLAPPABLE #-} KnownNat a => SingI a where
+instance KnownNat a => SingI a where
   sing = SING $ Nat $ TN.natVal (Proxy @a)
 
 instance Show Nat where
@@ -358,24 +356,8 @@ instance forall a. (Integral a, Z ~ Z# a) => SingI (Z# a) where
 -- used to fill in 'It' when the singular term can't be lifted
 data family It# :: k
 type family It :: k
-
-type Singular k = SingI (It :: k)
-
-it :: forall k. Singular k => k
-it = reflect @k @It
-
-type instance It = It# :: Dict p
-instance p => SingI (It# :: Dict p) where
-  sing = SING Dict
-
-type instance It = It# :: p :- q
-instance (p => q) => SingI (It# :: (p :- q)) where
-  sing = SING (Sub Dict)
-
 type instance It = 'SING It
-
 type instance It = '()
-
 type instance It = 'Proxy
 type instance It = 'Const It
 type instance It = '(It,It)
@@ -386,6 +368,21 @@ type instance It = '(It,It,It,It,It,It)
 type instance It = '(It,It,It,It,It,It,It)
 type instance It = '(It,It,It,It,It,It,It,It)
 type instance It = '(It,It,It,It,It,It,It,It,It)
+type instance It = 'Refl
+type instance It = 'HRefl
+type instance It = It# :: Dict p
+type instance It = It# :: p :- q
+
+type Singular k = SingI (It :: k)
+
+it :: forall k. Singular k => k
+it = reflect @k @It
+
+instance p => SingI (It# :: Dict p) where
+  sing = SING Dict
+
+instance (p => q) => SingI (It# :: (p :- q)) where
+  sing = SING (Sub Dict)
 
 --------------------------------------------------------------------------------
 -- * Lifting (Ptr a)
@@ -476,89 +473,3 @@ instance IsString Symbol where
 
 instance KnownSymbol s => SingI s where
   sing = SING $ Symbol $ symbolVal $ Proxy @s
-
---------------------------------------------------------------------------------
--- * Singleton Lists
---------------------------------------------------------------------------------
-
-{-
-type SList# :: forall a. [a] -> Type
-type role SList# nominal
-data SList# a where
-  SNil# :: SList# '[]
-  (:%) :: Sing a -> Sing as -> SList# (a ': as)
-
-infixr 5 :%
-
-upSList :: Sing a -> SList# a
-upSList (Sing [])     = unsafeCoerce SNil#
-upSList (Sing (a:as)) = unsafeCoerce $ SING a :% SING as
-
-pattern SNil :: () => xs ~ '[] => Sing xs
-pattern SNil <- (upSList -> SNil#) where
-  SNil = SING []
-
-pattern (:#) :: () => aas ~ (a ': as) => Sing a -> Sing as -> Sing aas
-pattern a :# as <- (upSList -> a :% as) where
-  Sing a :# Sing as = SING (a:as)
-
-infixr 5 :#
-
-{-# complete SNil, (:#) #-}
-
-instance SingI '[] where
-  sing = SNil
-
-instance (SingI a, SingI as) => SingI (a ': as) where
-  sing = sing :# sing
-
---------------------------------------------------------------------------------
--- * Singleton NonEmpty Lists
---------------------------------------------------------------------------------
-
-type SNonEmpty# :: forall a. NE.NonEmpty a -> Type
-type role SNonEmpty# nominal
-data SNonEmpty# a where
-  (:|%) :: Sing a -> Sing as -> SNonEmpty# (a 'NE.:| as)
-
-infixr 5 :|%
-
-upSNonEmpty :: Sing a -> SNonEmpty# a
-upSNonEmpty (Sing (a NE.:| as)) = unsafeCoerce $ SING a :|% SING as
-
-pattern (:|#) :: () => aas ~ (a 'NE.:| as) => Sing a -> Sing as -> Sing aas
-pattern a :|# as <- (upSNonEmpty -> a :|% as) where
-  Sing a :|# Sing as = SING (a NE.:| as)
-
-infixr 5 :|#
-
-{-# complete (:|#) #-}
-
-instance (SingI a, SingI as) => SingI (a 'NE.:| as) where
-  sing = sing :|# sing
-
--}
-
---------------------------------------------------------------------------------
--- * Singleton Products
---------------------------------------------------------------------------------
-
-{-
-type SPair# :: forall a b. (a,b) -> Type
-type role SPair# nominal
-data SPair# t where
-  SPair# :: Sing a -> Sing b -> SPair# '(a, b)
-
-upSPair :: Sing a -> SPair# a
-upSPair (Sing (a,b)) = unsafeCoerce $ SPair# (SING a) (SING b)
-
-pattern SPair :: () => r ~ '(a,b) => Sing a -> Sing b -> Sing r
-pattern SPair a b <- (upSPair -> SPair# a b) where
-  SPair (Sing a) (Sing b) = SING (a, b)
-
-{-# complete SPair #-}
-
-instance (SingI a, SingI b) => SingI '(a, b) where
-  sing = SPair sing sing
-
--}

@@ -86,7 +86,7 @@ library
     Data.Type
     Data.Type.Unsafe
     Data.Type.TH
-  other-modules:
     Data.Type.Internal
     Data.Type.Internal.Instances
     Data.Type.Internal.TH
+  other-modules:

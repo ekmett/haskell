@@ -27,10 +27,12 @@ module Data.Type
   , makeSing
   -- * Reifying terms and constraints into singletons
   , SingI(..)
-  , Reifies, ify , reify
+  , ify , reify
   -- * Lowering kinds to types
   , reflect
-  , Singular, It, it
+  , Singular
+  , it
+  , It
   -- ** 'Type'
   , type Type
   , pattern Type
@@ -91,6 +93,10 @@ module Data.Type
   , pattern SCompose
   -- ** 'Proxy'
   , pattern SProxy
+  -- ** '(:~:)'
+  , pattern SRefl
+  -- ** '(:~~:)'
+  , pattern SHRefl
   ) where
 
 import Data.Kind (Type)

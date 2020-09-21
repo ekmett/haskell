@@ -2,6 +2,7 @@
 {-# language ExplicitNamespaces #-}
 {-# language TemplateHaskell #-}
 {-# language StandaloneKindSignatures #-}
+{-# language TypeOperators #-}
 {-# language FlexibleInstances #-}
 {-# language DataKinds #-}
 {-# language PolyKinds #-}
@@ -26,6 +27,7 @@ import Data.Functor.Compose
 import Data.List.NonEmpty
 import Data.Proxy
 import Data.Type.Internal.TH
+import Data.Type.Equality
 
 makeSing ''Either
 makeSing ''Maybe
@@ -46,3 +48,5 @@ makeSing ''(,,,,,)
 makeSing ''(,,,,,,)
 makeSing ''(,,,,,,,)
 makeSing ''(,,,,,,,,)
+makeSing ''(:~:)
+makeSing ''(:~~:)
