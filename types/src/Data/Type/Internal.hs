@@ -134,8 +134,14 @@ instance StrictEq (Sing a)
 instance StrictEq k => GEq (Sing @k) where
   geq = testEquality
 
+instance (StrictEq k, Ord k) => GCompare (Sing @k) where
+  gcompare (Sing i) (Sing j) = case compare i j of
+    LT -> GLT
+    EQ -> unsafeCoerce GEQ
+    GT -> GGT
+
 -- assumes equality is structural.
-instance StrictEq k => TestEquality (Sing :: k -> Type) where
+instance StrictEq k => TestEquality (Sing @k) where
   testEquality (Sing i) (Sing j)
     | i == j = Just (unsafeCoerce Refl)
     | otherwise = Nothing
