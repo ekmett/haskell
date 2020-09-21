@@ -228,6 +228,25 @@ pattern Nat n <- (fromNat -> n) where
 
 {-# complete Nat #-}
 
+type SNat' :: Nat -> Type
+data SNat' (n :: Nat) where
+  SNatZ' :: SNat' Z
+  SNatS' :: Sing n -> SNat' (S n)
+
+upSNat :: Sing n -> SNat' n
+upSNat (UnsafeSing 0) = unsafeCoerce SNatZ'
+upSNat (UnsafeSing n) = unsafeCoerce $ SNatS' (UnsafeSing (n-1))
+
+pattern SNatZ :: forall (n::Nat). () => n ~ Z => Sing n
+pattern SNatZ <- (upSNat -> SNatZ') where
+  SNatZ = UnsafeSing 0
+
+pattern SNatS :: forall (n::Nat). () => forall (n'::Nat). n ~ S n' => Sing n' -> Sing n
+pattern SNatS n <- (upSNat -> SNatS' n) where
+  SNatS (Sing n) = UnsafeSing (S n)
+
+{-# complete SNatS, SNatZ #-}
+
 -----------------------------------------------------------------------------
 -- * Lifting Natural
 --

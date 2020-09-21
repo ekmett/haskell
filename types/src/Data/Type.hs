@@ -38,6 +38,8 @@ module Data.Type
   , Nat
   , toNat, fromNat
   , pattern Nat
+  , pattern SNatZ
+  , pattern SNatS
   -- , pattern SNat
   -- ** 'Symbol'
   , Symbol
