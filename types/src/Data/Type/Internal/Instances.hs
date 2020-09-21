@@ -23,6 +23,7 @@ module Data.Type.Internal.Instances where
 import Control.Applicative
 import Data.Functor.Identity
 import Data.Functor.Compose
+import Data.List.NonEmpty
 import Data.Proxy
 import Data.Type.Internal.TH
 
@@ -34,3 +35,14 @@ makeSing ''Const
 makeSing ''Compose
 makeSing ''Identity
 makeSing ''Proxy
+makeSing ''[]
+makeSing ''NonEmpty
+makeSing ''()
+makeSing ''(,)
+makeSing ''(,,)
+makeSing ''(,,,)
+makeSing ''(,,,,)
+makeSing ''(,,,,,)
+makeSing ''(,,,,,,)
+makeSing ''(,,,,,,,)
+makeSing ''(,,,,,,,,)

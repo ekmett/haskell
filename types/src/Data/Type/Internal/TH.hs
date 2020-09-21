@@ -37,18 +37,39 @@ import Language.Haskell.TH as TH
 import Unsafe.Coerce
 
 data SingRules = SingRules
-  { singTyCon    :: Name -> Name
-  , singDataCon  :: Name -> Name
-  , singDataCon' :: Name -> Name
-  , singUp       :: Name -> Name
+  { singTyCon    :: Name -> Name -- Q
+  , singDataCon  :: Name -> Name -- produce the final visible name
+  , singDataCon' :: Name -> Name -- Q
+  , singUp       :: Name -> Name -- Q
   }
+
+esst :: String -> String
+esst "[]" = "SList"
+esst "()" = "SUnit"
+esst ('(':',':xs) = "STuple" ++ show (2+length (takeWhile (==',') xs))
+esst xs@(':':_) = xs ++ "#"
+esst xs = 'S':xs
+
+essd :: String -> String
+essd "[]" = "SNil"
+essd xs = esst xs
+
+up :: String -> String
+up xs@(':':_) = '#':xs
+up xs = "up" ++ xs
+
+hashed :: String -> String
+hashed xs = xs ++ "#"
+
+mapName :: (String -> String) -> Name -> Name
+mapName f = mkName . f . nameBase
 
 defaultSingRules :: SingRules
 defaultSingRules = SingRules{..} where
-  singTyCon    =  mkName . (++"'") . ('S':) . nameBase
-  singDataCon  =  mkName  . ('S':) . nameBase
-  singDataCon' =  mkName . (++"'") . ('S':) . nameBase
-  singUp       =  mkName . ("upS"++) . nameBase
+  singTyCon    = mapName (hashed . esst)
+  singDataCon  = mapName essd
+  singDataCon' = mapName (hashed . essd)
+  singUp       = mapName (up . esst)
 
 makeSingWith :: SingRules -> Name -> Q [Dec]
 makeSingWith opts n = TH.reify n >>= \case
@@ -56,6 +77,7 @@ makeSingWith opts n = TH.reify n >>= \case
     DataD    [] name tyvars mkind cons _ -> makeSing' opts name tyvars mkind cons
     NewtypeD [] name tyvars mkind con _ -> makeSing' opts name tyvars mkind [con]
     _ -> fail "makeSing: can only handle data and newtype declarations"
+  d@(PrimTyConI _name _arity _unlifted) -> fail $ "makeSing: unsupported PrimTyConI\n\n" ++ pprint d
   d -> fail $ "makeSing: unsupported type\n\n" ++ pprint d
 
 makeSing :: Name -> Q [Dec]
@@ -112,6 +134,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
     , pure <$> makeData
     , makeUp
     , concat <$> traverse makePattern cons
+    , concat <$> traverse makeFixity cons
     , pure <$> makeComplete
     , concat <$> traverse makeSingI cons
     ] where
@@ -219,6 +242,19 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
       ForallC _ _ con -> makePattern con
       InfixC _ n _ -> makePattern' 2 n
       -- d -> fail $ "makeSing.makePattern: unsupported data constructor type\n\n" ++ pprint d
+
+    makeFixity :: Con -> Q [Dec]
+    makeFixity = \case
+        NormalC n _ -> go n
+        RecC n _ -> go n
+        GadtC ns _ _ -> concat <$> traverse go ns
+        RecGadtC ns _ _ -> concat <$> traverse go ns
+        ForallC _ _ con -> makeFixity con
+        InfixC _ n _ -> go n
+      where
+        go n = reifyFixity n >>= \case
+          Just fixity -> pure [InfixD fixity (singDataCon n)]
+          Nothing -> pure []
 
     -- pattern SLeft :: () => (ma ~ 'Left a) => Sing a -> Sing ma
     -- pattern SLeft a <- (upSEither -> SLeft' a) where

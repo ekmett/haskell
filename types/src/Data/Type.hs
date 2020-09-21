@@ -62,7 +62,15 @@ module Data.Type
   , pattern SMkStablePtr
   -- * Singletons
   -- ** '(,)'
-  , pattern SPair -- (,)
+  , pattern SUnit
+  , pattern STuple2 -- (,)
+  , pattern STuple3 -- (,,)
+  , pattern STuple4 -- (,,,)
+  , pattern STuple5 -- (,,,,)
+  , pattern STuple6 -- (,,,,,)
+  , pattern STuple7 -- (,,,,,,)
+  , pattern STuple8 -- (,,,,,,,)
+  , pattern STuple9 -- (,,,,,,,,)
   -- ** 'Either'
   , pattern SLeft, pattern SRight -- Either
   -- ** 'Maybe'

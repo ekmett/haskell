@@ -382,12 +382,10 @@ type instance It = '(It,It)
 type instance It = '(It,It,It)
 type instance It = '(It,It,It,It)
 type instance It = '(It,It,It,It,It)
-
---------------------------------------------------------------------------------
--- * ()
---------------------------------------------------------------------------------
-
-instance SingI '() where sing = SING ()
+type instance It = '(It,It,It,It,It,It)
+type instance It = '(It,It,It,It,It,It,It)
+type instance It = '(It,It,It,It,It,It,It,It)
+type instance It = '(It,It,It,It,It,It,It,It,It)
 
 --------------------------------------------------------------------------------
 -- * Lifting (Ptr a)
@@ -483,6 +481,7 @@ instance KnownSymbol s => SingI s where
 -- * Singleton Lists
 --------------------------------------------------------------------------------
 
+{-
 type SList# :: forall a. [a] -> Type
 type role SList# nominal
 data SList# a where
@@ -538,11 +537,13 @@ infixr 5 :|#
 instance (SingI a, SingI as) => SingI (a 'NE.:| as) where
   sing = sing :|# sing
 
+-}
 
 --------------------------------------------------------------------------------
 -- * Singleton Products
 --------------------------------------------------------------------------------
 
+{-
 type SPair# :: forall a b. (a,b) -> Type
 type role SPair# nominal
 data SPair# t where
@@ -560,3 +561,4 @@ pattern SPair a b <- (upSPair -> SPair# a b) where
 instance (SingI a, SingI b) => SingI '(a, b) where
   sing = SPair sing sing
 
+-}
