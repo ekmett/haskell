@@ -105,14 +105,6 @@ fvs PromotedT{} = mempty
 
 makeSing' :: SingRules -> Name -> [TyVarBndr] -> Maybe Kind -> [Con] -> Q [Dec]
 makeSing' SingRules{..} name bndrs _mkind cons = do
--- this is buggy for some reason in the repl, enabling the extensions doesn't cause this to pass
-{-
-  let exts = [StandaloneKindSignatures, GADTs, RoleAnnotations, DataKinds, PolyKinds, PatternSynonyms]
-  enabled <- for exts isExtEnabled
-  unless (and enabled) do
-    fail $ "makeSing: Required language extensions are missing: " ++ intercalate ", " [ show e | e <- exts | False <- enabled ]
--}
-
   concat <$> sequence
     [ pure <$> makeKiSig
     , pure <$> makeRole
@@ -185,29 +177,6 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
                (normalB $ foldl (\l _ -> appE l (varE 'sing)) (conE $ singDataCon n) ts)
                []
         ]
-
-{-
-    makeSingI :: Con -> Q [Dec]
-    makeSingI = \case
-        NormalC n ts -> pure <$> makeSingI' n (snd <$> ts)
-        RecC n ts    -> pure <$> makeSingI' n (thd <$> ts)
-        d -> fail $ "makeSing.makeSingI: unsupported data constructor type\n\n" ++ pprint d
-    makeSingI' :: Name -> [Type] -> Q Dec
-    makeSingI' n tys = instanceD cxt' typeQ
-      [ valD (varP 'sing) (normalB $ foldl (\l _ -> appE l (varE 'sing)) (conE $ singDataCon n) tys) []
-      ] where
-      qtys = pure <$> tys
-      cxt' = for qtys $ appT (conT ''SingI)
-      typeQ = appT csingi $ foldl appT (promotedT n) qtys
--}
-
-{-
-    conName :: Con -> Name
-    conName (NormalC n _) = n
-    conName (RecC n _) = n
-    conName (InfixC _ n _) = n
-    conName _ = error "unsupported constructor type"
--}
 
     -- upSEither :: Sing a -> SEither' a
     -- upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (SING a))
