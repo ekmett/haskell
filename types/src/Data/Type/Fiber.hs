@@ -11,13 +11,15 @@
 {-# language TypeApplications #-}
 {-# language TypeOperators #-}
 
-module Data.Type.Fiber 
+module Data.Type.Fiber
   ( type (->#)(..)
   , unarr
   ) where
 
 import Control.Arrow
 import Control.Category
+import Data.Profunctor
+import Data.Profunctor.Traversing
 import Data.Kind
 import Data.Type.Internal
 import Data.Type.Internal.Instances
@@ -30,6 +32,37 @@ type role (->#) nominal nominal
 data a -># b where
   Fiber :: forall a b. { runFiber :: (forall (i::a). Sing i -> Some (SingT @b)) } -> a -># b
 infixr 0 ->#
+
+instance Functor ((->#) a) where
+  fmap f g = arr f . g
+
+instance Profunctor (->#) where
+  dimap f g h = arr g . h . arr f
+
+instance Choice (->#) where
+  left' = left
+  right' = right
+
+instance Strong (->#) where
+  first' = first
+  second' = second
+
+instance Closed (->#) where
+  closed = arr . closed . unarr
+
+instance Mapping (->#) where
+  map' = arr . fmap . unarr
+
+instance Traversing (->#) where
+  wander f = arr . wander f . unarr
+
+instance Costrong (->#) where
+  unfirst = arr . unfirst . unarr
+  unsecond = arr . unsecond . unarr
+
+instance Cochoice (->#) where
+  unleft = arr . unleft . unarr
+  unright = arr . unright . unarr
 
 instance Category (->#) where
   id = Fiber Some
@@ -52,7 +85,7 @@ instance Arrow (->#) where
     STuple2 x y -> case runFiber f x of
       Some x' -> case runFiber g y of
         Some y' -> Some $ STuple2 x' y'
-  f &&& g = Fiber \x -> 
+  f &&& g = Fiber \x ->
     case runFiber f x of
       Some y -> case runFiber g x of
         Some z -> Some $ STuple2 y z
@@ -71,7 +104,7 @@ instance ArrowChoice (->#) where
       Some a' -> Some (SLeft a')
     SRight b -> case runFiber g b of
       Some b' -> Some (SRight b')
-    
+
 instance ArrowApply (->#) where
   app = Fiber \case
     STuple2 f x -> runFiber (fromSing f) x

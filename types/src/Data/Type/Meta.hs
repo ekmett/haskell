@@ -113,7 +113,7 @@ apply = unmapSing \case
  STuple2 (Sing x) p -> _ x p
 -}
 
--- withSingI p (fromSing x) 
+-- withSingI p (fromSing x)
 
 {-
 curry :: ('(a,b) !-> c) -> a !-> b !=> c
