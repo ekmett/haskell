@@ -81,25 +81,25 @@ import Type.Reflection
 
 type (!->) :: forall i j. i -> j -> Type
 type role (!->) nominal nominal
-newtype a !-> b = Subs (SingI a => Sing b)
+newtype a !-> b = Subs (Sing a => Sing b)
 infixr 0 !->
 
 type Subsing = Me# :: p !-> q
 type instance Me = Subsing :: p !-> q
-instance (SingI p => SingI q) => SingI @(p !-> q) Subsing where
+instance (Sing p => SingI q) => SingI @(p !-> q) Subsing where
   sing = SING (Subs sing)
 
 
-withDict :: forall q r. SingI @Constraint q => (q => r) -> r
+withDict :: forall q r. Sing @Constraint q => (q => r) -> r
 withDict r = case sing @_ @q of
   SConstraint -> r
 
 apply :: '(a !=> b, a) !-> b
 apply = unmapSing \case
- STuple2 SConstraint p -> withSingI p sing
+ STuple2 SConstraint p -> withSing p sing
 
-class (SingI p => SingI q) => p !=> q
-instance (SingI p => SingI q) => p !=> q
+class (Sing p => SingI q) => p !=> q
+instance (Sing p => SingI q) => p !=> q
 
 -- pattern SSubs :: (p !=> q) -> Sing (Subsing :: p !-> q)
 -- wat :: Sing (p !=> q) -> Sing (Me# :: p !-> q)
@@ -133,17 +133,17 @@ instance No Void where
 fromNo :: forall k a b. No k => (a::k) !-> b
 fromNo = Subs $ no $ reflect @_ @a
 
-(!!) :: SingI p => (SingI q => r) -> (p !-> q) -> r
-r !! Subs sq = withSingI sq r
+(!!) :: Sing p => (Sing q => r) -> (p !-> q) -> r
+r !! Subs sq = withSing sq r
 
-(\!) :: p => (SingI q => r) -> (p !-> q) -> r
-r \! Subs sq = withSingI sq r
+(\!) :: p => (Sing q => r) -> (p !-> q) -> r
+r \! Subs sq = withSing sq r
 
-(!\) :: forall p q r. SingI p => (q => r) -> (p !-> q) -> r
-r !\ Subs sq = withSingI sq $ withDict @q r
+(!\) :: forall p q r. Sing p => (q => r) -> (p !-> q) -> r
+r !\ Subs sq = withSing sq $ withDict @q r
 
 (\\) :: forall p q r. p => (q => r) -> (p !-> q) -> r
-r \\ Subs sq = withSingI sq $ withDict @q r
+r \\ Subs sq = withSing sq $ withDict @q r
 
 instance Category (!->) where
   id = Subs sing
@@ -166,7 +166,7 @@ nohomo f = Subs $ case sing @_ @a of
     Sub Dict -> SConstraint
 
 mapSing :: (a !-> b) -> Sing a -> Sing b
-mapSing f s = withSingI s $ sing !! f
+mapSing f s = withSing s $ sing !! f
 
 unmapSing :: (Sing a -> Sing b) -> a !-> b
 unmapSing f = Subs (f sing)

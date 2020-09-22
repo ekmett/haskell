@@ -9,6 +9,7 @@
 {-# language RoleAnnotations #-}
 {-# language ViewPatterns #-}
 {-# language GADTs #-}
+{-# language MagicHash #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- |
@@ -21,14 +22,11 @@
 module Data.Type
   (
   -- * Singleton types and reflection from singletons
-    Sing
-    ( Sing
-    , fromSing
-    )
-  , makeSing
-  -- * Reifying terms and constraints into singletons
+    type Sing
+  , SingT(Sing, fromSing)
   , SingI(..)
-  , withSingI
+  , makeSing
+  , withSing
   -- * Reflection
   , reify
   , reflect
@@ -36,6 +34,7 @@ module Data.Type
   , Singular
   , me
   , Me
+  -- makeMe
   -- ** 'Type'
   , type Type
   , pattern Type

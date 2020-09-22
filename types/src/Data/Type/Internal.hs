@@ -117,39 +117,52 @@ instance StrictEq (StablePtr a)
 -- * Singletons
 --------------------------------------------------------------------------------
 
-type Sing :: forall k. k -> Type
-type role Sing nominal
-newtype Sing (a :: k) = SING { fromSing :: k }
+{-
+type Sing :: forall k j. k -> j
+type family Sing (p :: k) where
+  Sing p = p -- makes us too strict in our arguments
+  Sing p = SingT p
+  Sing p = SingI p
+-}
+
+type Sing :: forall k j. k -> j
+type family Sing
+type instance Sing = SingT
+type instance Sing = SingI
+
+type SingT :: forall k. k -> Type
+type role SingT nominal
+newtype SingT (a :: k) = SING { fromSing :: k }
   deriving Hashable
 
-instance (Typeable k, Show k) => Show (Sing (a :: k)) where
+instance (Typeable k, Show k) => Show (SingT (a :: k)) where
   showsPrec d (Sing k) = showParen (d > 10) $
     showString "Sing @" . showsPrec 11 (typeRep @k) . showChar ' ' . showsPrec 11 k
 
-pattern Sing :: k -> Sing (a :: k)
+pattern Sing :: k -> SingT (a :: k)
 pattern Sing x <- (SING x)
 
-{-# complete Sing #-}
+{-# complete Sing :: SingT #-}
 
-instance Eq (Sing a) where
+instance Eq (SingT a) where
   _ == _ = True
 
-instance Ord (Sing a) where
+instance Ord (SingT a) where
   compare _ _ = EQ
 
-instance StrictEq (Sing a)
+instance StrictEq (SingT a)
 
-instance StrictEq k => GEq (Sing @k) where
+instance StrictEq k => GEq (SingT @k) where
   geq = testEquality
 
-instance (StrictEq k, Ord k) => GCompare (Sing @k) where
+instance (StrictEq k, Ord k) => GCompare (SingT @k) where
   gcompare (Sing i) (Sing j) = case compare i j of
     LT -> GLT
     EQ -> unsafeCoerce1 GEQ
     GT -> GGT
 
 -- assumes equality is structural.
-instance StrictEq k => TestEquality (Sing @k) where
+instance StrictEq k => TestEquality (SingT @k) where
   testEquality (Sing i) (Sing j)
     | i == j = Just (unsafeCoerce1 Refl)
     | otherwise = Nothing
@@ -160,34 +173,34 @@ instance StrictEq k => TestEquality (Sing @k) where
 
 type SingI :: forall k. k -> Constraint
 class SingI a where
-  sing :: Sing a
+  sing :: SingT a
 
 -- bootstrapping singleton singletons
-instance SingI k => SingI @(Sing k) ('SING a) where
+instance Sing k => SingI @(SingT k) ('SING a) where
   sing = SING sing
 
 type Wrap :: forall k. k -> Type -> Type
 #ifdef USE_MAGICDICT
-data Wrap s r = Wrap (SingI s => Proxy# s -> r)
-withSingI# :: (SingI a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
-withSingI# f x y = magicDict (Wrap f) x y
+data Wrap s r = Wrap (Sing s => Proxy# s -> r)
+withSing# :: (Sing a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
+withSing# f x y = magicDict (Wrap f) x y
 #else
-newtype Wrap s r = Wrap (SingI s => Proxy# s -> r)
-withSingI# :: (SingI a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
-withSingI# f x y = unsafeCoerce (Wrap f) x y
-{-# inline withSingI# #-}
+newtype Wrap s r = Wrap (Sing s => Proxy# s -> r)
+withSing# :: (Sing a => Proxy# a -> r) -> Sing a -> Proxy# a -> r
+withSing# f x y = unsafeCoerce (Wrap f) x y
+{-# inline withSing# #-}
 #endif
 
-withSingI :: Sing a -> (SingI a => r) -> r
-withSingI s r = withSingI# (\_ -> r) s proxy#
+withSing :: Sing a -> (Sing a => r) -> r
+withSing s r = withSing# (\_ -> r) s proxy#
 
-reify :: k -> (forall (a::k). SingI a => Proxy# a -> r) -> r
-reify k f = withSingI# f (SING k) proxy#
+reify :: k -> (forall (a::k). Sing a => Proxy# a -> r) -> r
+reify k f = withSing# f (SING k) proxy#
 
-reflect :: forall k (a::k). SingI a => k
+reflect :: forall k (a::k). Sing a => k
 reflect = fromSing (sing @k @a)
 
-reflect# :: forall k (a::k). SingI a => Proxy# a -> k
+reflect# :: forall k (a::k). Sing a => Proxy# a -> k
 reflect# _ = fromSing (sing @k @a)
 
 data family Me# :: k
@@ -209,7 +222,7 @@ type instance Me = 'HRefl
 type instance Me = Me# :: Dict p
 type instance Me = Me# :: p :- q
 
-type Singular k = SingI @k Me
+type Singular k = Sing @k Me
 
 me :: forall k. Singular k => k
 me = reflect @k @Me
@@ -497,7 +510,7 @@ concat <$> for
       type NiceZ = Z# $(n)
       type NiceS = S# $(n)
       sinj _ = Refl
-    instance SingI n => SingI (S# $(n) n) where sing = SS sing
+    instance Sing n => SingI (S# $(n) n) where sing = SS sing
     instance SingI (Z# $(n)) where sing = SZ
     |]
 
@@ -537,7 +550,7 @@ data family FromWordPtr# :: WordPtr -> k
 type MkPtr :: forall a. WordPtr -> Ptr a
 type MkPtr = FromWordPtr#
 
-instance SingI n => SingI (MkPtr n) where
+instance Sing n => SingI (MkPtr n) where
   sing = SMkPtr sing
 
 pattern SMkPtr :: Sing n -> Sing (MkPtr n)
@@ -555,7 +568,7 @@ data family FromPtr# :: Ptr a -> k
 type MkStablePtr :: forall a. Ptr () -> StablePtr a
 type MkStablePtr = FromPtr#
 
-instance SingI n => SingI (MkStablePtr n) where
+instance Sing n => SingI (MkStablePtr n) where
   sing = SMkStablePtr sing
 
 pattern SMkStablePtr :: Sing n -> Sing (MkStablePtr n)

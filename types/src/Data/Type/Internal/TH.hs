@@ -89,6 +89,9 @@ csingi = conT ''SingI
 csing :: Q Type
 csing = conT ''Sing
 
+csing# :: Q Type
+csing# = conT ''SingT
+
 tyVarBndrName :: TyVarBndr -> Name
 tyVarBndrName (PlainTV n) = n
 tyVarBndrName (KindedTV n _) = n
@@ -264,7 +267,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
         args <- fresh d
         res <- newName "r"
         let patSynType = forallT [] (pure []) $ forallT [] lessons $
-              foldr (\l r -> (csing `appT` varT l) `arrT` r) (csing `appT` varT res) args
+              foldr (\l r -> (csing `appT` varT l) `arrT` r) (csing# `appT` varT res) args
             lessons = sequence
               [eqT (varT res) (foldl (\l r -> l `appT` varT r) (promotedT cname) args)]
               -- :[] -- : [ eqT (varT v) (pure t) | v <- args | t <- tys ]

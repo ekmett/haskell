@@ -28,7 +28,7 @@ import Prelude hiding (id,(.))
 type (->#) :: Type -> Type -> Type
 type role (->#) nominal nominal
 data a -># b where
-  Fiber :: forall a b. { runFiber :: (forall (i::a). Sing i -> Some (Sing @b)) } -> a -># b
+  Fiber :: forall a b. { runFiber :: (forall (i::a). Sing i -> Some (SingT @b)) } -> a -># b
 infixr 0 ->#
 
 instance Category (->#) where

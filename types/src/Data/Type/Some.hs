@@ -2,6 +2,7 @@
 {-# language RankNTypes #-}
 {-# language TypeApplications #-}
 {-# language TypeOperators #-}
+{-# language MagicHash #-}
 
 -- parametric colimits
 
@@ -19,11 +20,11 @@ import Control.Applicative
 import Data.Type.Internal
 import Data.Some
 
-fromSS :: Some (Sing @a) -> a
+fromSS :: Some (SingT @a) -> a
 fromSS (Some (Sing a)) = a
 {-# inline fromSS #-}
 
-toSS :: a -> Some (Sing @a)
+toSS :: a -> Some (SingT @a)
 toSS a = Some (SING a)
 {-# inline toSS #-}
 

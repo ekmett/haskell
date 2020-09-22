@@ -9,7 +9,7 @@
 -- Portability: non-portable
 
 module Data.Type.Unsafe
-  ( Sing(..)
+  ( SingT(..)
   , FromPtr#
   , FromWordPtr#
   , Me#
