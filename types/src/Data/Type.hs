@@ -107,7 +107,7 @@ module Data.Type
   -- ** Dict p
   , MkDict
   -- ** p :- q
-  , MkSubDict
+  --, MkSubDict
   ) where
 
 import Data.Type.Internal

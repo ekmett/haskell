@@ -203,8 +203,8 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
         ]
 
     -- upSEither :: Sing a -> SEither' a
-    -- upSEither (Sing (Left a))  = unsafeCoerce (SLeft' (SING a))
-    -- upSEither (Sing (Right b)) = unsafeCoerce (SRight' (SING b))
+    -- upSEither (Sing (Left a))  = unsafeCoerce1 (SLeft' (SING a))
+    -- upSEither (Sing (Right b)) = unsafeCoerce1 (SRight' (SING b))
     makeUp :: Q [Dec]
     makeUp = sequence $
       [ sigD (singUp name) $ appT csing (varT (mkName "a")) `arrT` appT (conT sname) (varT (mkName "a"))
@@ -224,7 +224,7 @@ makeSing' SingRules{..} name bndrs _mkind cons = do
       args <- fresh d
       clause
         [conP 'Sing [conP n (varP <$> args)]]
-        do normalB $ varE 'unsafeCoerce `appE`
+        do normalB $ varE 'unsafeCoerce1 `appE`
              foldl (\l r -> l `appE` (conE 'SING `appE` varE r)) (conE (singDataCon' n)) args
         []
 

@@ -1,6 +1,7 @@
 {-# language AllowAmbiguousTypes #-}
 {-# language BangPatterns #-}
 {-# language BlockArguments #-}
+{-# language PatternSynonyms #-}
 {-# language ConstraintKinds #-}
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
@@ -83,24 +84,38 @@ type role (!->) nominal nominal
 newtype a !-> b = Subs (SingI a => Sing b)
 infixr 0 !->
 
-type MkSubs = Me# :: p !-> q
-type instance Me = MkSubs :: p !-> q
-instance (SingI p => SingI q) => SingI (Me# :: (p !-> q)) where
+type Subsing = Me# :: p !-> q
+type instance Me = Subsing :: p !-> q
+instance (SingI p => SingI q) => SingI @(p !-> q) Subsing where
   sing = SING (Subs sing)
+
 
 withDict :: forall q r. SingI @Constraint q => (q => r) -> r
 withDict r = case sing @_ @q of
   SConstraint -> r
 
-class (SingI p => SingI q) => p !=> q
-instance (SingI p => SingI q) => p !=> q
-
-apply :: '(p !=> q, p) !-> q
+apply :: '(a !=> b, a) !-> b
 apply = unmapSing \case
  STuple2 SConstraint p -> withSingI p sing
 
--- curry
--- uncurry
+class (SingI p => SingI q) => p !=> q
+instance (SingI p => SingI q) => p !=> q
+
+-- pattern SSubs :: (p !=> q) -> Sing (Subsing :: p !-> q)
+-- wat :: Sing (p !=> q) -> Sing (Me# :: p !-> q)
+
+{-
+apply :: forall i j (a::i) (b::j). '(a !-> b, a) !-> b
+apply = unmapSing \case
+ STuple2 (Sing x) p -> _ x p
+-}
+
+-- withSingI p (fromSing x) 
+
+{-
+curry :: ('(a,b) !-> c) -> a !-> b !=> c
+curry f = unmapSing \a -> unmapSing \b -> mapSing f (STuple (a b))
+-}
 
 toMe :: Singular k => a !-> (Me::k)
 toMe = unmapSing \_ -> me
@@ -114,7 +129,7 @@ class No k where
 instance No Void where
   no = absurd
 
--- ex-falso, which is probably dangerous in a lazy language
+-- ex-falso, which is probably dangerous in a lazy non-total language
 fromNo :: forall k a b. No k => (a::k) !-> b
 fromNo = Subs $ no $ reflect @_ @a
 

@@ -10,6 +10,8 @@
 {-# language FlexibleContexts #-}
 {-# language GADTs #-}
 {-# language GeneralizedNewtypeDeriving #-}
+{-# language MultiParamTypeClasses #-}
+-- {-# language ImpredicativeTypes #-}
 {-# language ImportQualifiedPost #-}
 {-# language LambdaCase #-}
 {-# language MagicHash #-}
@@ -30,6 +32,7 @@
 {-# language ViewPatterns #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-} -- go home, ghc, you're drunk
 
 -- |
 -- Copyright :  (c) Edward Kmett 2020
@@ -67,6 +70,10 @@ import Numeric.Natural
 import Text.Read hiding (Symbol)
 import Type.Reflection
 import Unsafe.Coerce
+
+-- | You know, just to be a little safer.
+unsafeCoerce1 :: forall f a b. f a -> f b
+unsafeCoerce1 = unsafeCoerce
 
 --------------------------------------------------------------------------------
 -- * Structural Equality
@@ -138,13 +145,13 @@ instance StrictEq k => GEq (Sing @k) where
 instance (StrictEq k, Ord k) => GCompare (Sing @k) where
   gcompare (Sing i) (Sing j) = case compare i j of
     LT -> GLT
-    EQ -> unsafeCoerce GEQ
+    EQ -> unsafeCoerce1 GEQ
     GT -> GGT
 
 -- assumes equality is structural.
 instance StrictEq k => TestEquality (Sing @k) where
   testEquality (Sing i) (Sing j)
-    | i == j = Just (unsafeCoerce Refl)
+    | i == j = Just (unsafeCoerce1 Refl)
     | otherwise = Nothing
 
 --------------------------------------------------------------------------------
@@ -183,6 +190,30 @@ reflect = fromSing (sing @k @a)
 reflect# :: forall k (a::k). SingI a => Proxy# a -> k
 reflect# _ = fromSing (sing @k @a)
 
+data family Me# :: k
+type family Me :: k
+type instance Me = 'SING Me
+type instance Me = '()
+type instance Me = 'Proxy
+type instance Me = 'Const Me
+type instance Me = '(Me,Me)
+type instance Me = '(Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me,Me,Me)
+type instance Me = '(Me,Me,Me,Me,Me,Me,Me,Me,Me)
+type instance Me = 'Refl
+type instance Me = 'HRefl
+type instance Me = Me# :: Dict p
+type instance Me = Me# :: p :- q
+
+type Singular k = SingI @k Me
+
+me :: forall k. Singular k => k
+me = reflect @k @Me
+
 --------------------------------------------------------------------------------
 -- * Lowering Constraint
 --------------------------------------------------------------------------------
@@ -208,17 +239,100 @@ data SConstraint# p where
   SConstraint# :: Dict p -> SConstraint# p
 
 upSConstraint# :: Sing p -> SConstraint# p
-upSConstraint# (Sing (Constraint t)) = unsafeCoerce (SConstraint# t)
+upSConstraint# (Sing (Constraint t)) = unsafeCoerce1 (SConstraint# t)
 
-pattern SConstraint' :: Dict p -> Sing @Constraint p
-pattern SConstraint' t <- (upSConstraint# -> SConstraint# t) where
-  SConstraint' t = SING $ Constraint t
+pattern SConstraintDict :: Dict p -> Sing p
+pattern SConstraintDict t <- (upSConstraint# -> SConstraint# t) where
+  SConstraintDict t = SING $ Constraint t
 
 pattern SConstraint :: () => p => Sing p
-pattern SConstraint = SConstraint' Dict
+pattern SConstraint = SConstraintDict Dict
 
 instance p => SingI p where
   sing = SConstraint
+
+--------------------------------------------------------------------------------
+-- * Dict itself as a kind
+--------------------------------------------------------------------------------
+
+-- should be handleable by template-haskell with very minor changes
+type SDict# :: forall p. Dict p -> Type
+type role SDict# nominal
+data SDict# t where
+  SMkDict# :: p => SDict# (MkDict :: Dict p)
+           -- ^- gather context from constructor, pass it along
+
+upSDict# :: forall (p :: Constraint) (a :: Dict p). Sing a -> SDict# a
+upSDict# (Sing Dict) = unsafeCoerce1 (SMkDict# @p)
+
+
+pattern SDict
+  :: forall (p::Constraint) (r::Dict p).
+  () =>
+  (p, r ~ MkDict) => Sing r
+-- ^- and pass it out here
+pattern SDict <- (upSDict# -> SMkDict#) where
+  SDict = SING Dict
+
+type MkDict = Me# :: Dict p
+instance p => SingI (MkDict :: Dict p) where
+  sing = SDict
+
+mapC :: (p :- q) -> Sing p -> Sing q
+mapC x SConstraint = case x of
+  Sub Dict -> SConstraint
+
+duck :: (p => q) => p :- q
+duck = Sub Dict
+
+newtype Quack p q r = Quack ((p => q) => r)
+
+quack :: forall p q r. (p :- q) -> ((p => q) => r) -> r
+quack p r = unsafeCoerce (Quack @p @q @r r) (mapC p)
+
+{-
+dsd :: Dict (p => q) -> p :- q
+dsd d = Sub $ case d of
+  Dict -> Dict
+-}
+
+
+
+{-
+data Duck p q = Duck (Sing p -> Sing q)
+sdd :: forall p q. (p :- q) -> Dict (p => q)
+sdd f = unsafeCoerce go where
+  go :: Duck p q
+  go = Duck \SConstraint -> case f of
+    Sub Dict -> SConstraint
+-}
+
+
+type MkSubDict :: p :- q
+type MkSubDict = Me#
+instance (p => q) => SingI (MkSubDict :: (p :- q)) where
+  sing = SING (Sub Dict)
+
+-- pattern SMkSubDict :: () => (p => q, r ~ MkSubDict) => Sing @(p :- q) r
+
+
+{-
+type MkSubDict = Me# :: p :- q
+
+-- Sub :: p => Dict q -> (p :- q)
+-- SSub :: p => Sing (x :: Dict q) -> Sing ('Sub x :: p :- q)
+
+--type MkSub# :: forall p q. (p !-> q) -> p :- q
+--type MkSub# = Me#
+-- pattern SSubs :: (p => q) -> Sing (MkSubDict :: p !-> q)
+--
+-- should be handleable by template-haskell with very minor changes
+type SEntails# :: forall p q. (p :- q) -> Type
+type role SEntails# nominal
+data SEntails# t where
+  SMkSub# :: (p => Sing q) -> SEntails# (MkSubDict :: p :- q)
+
+-}
 
 --------------------------------------------------------------------------------
 -- * Lowering Types
@@ -252,7 +366,7 @@ data SType' a where
   SType' :: TypeRep a -> SType' (a :: Type)
 
 upSType :: Sing a -> SType' a
-upSType (Sing (Type t)) = unsafeCoerce (SType' t)
+upSType (Sing (Type t)) = unsafeCoerce1 (SType' t)
 
 pattern SType :: TypeRep a -> Sing (a :: Type)
 pattern SType t <- (upSType -> SType' t) where
@@ -382,7 +496,7 @@ concat <$> for
     instance Nice $(n) where
       type NiceZ = Z# $(n)
       type NiceS = S# $(n)
-      sinj _ = Refl 
+      sinj _ = Refl
     instance SingI n => SingI (S# $(n) n) where sing = SS sing
     instance SingI (Z# $(n)) where sing = SZ
     |]
@@ -393,8 +507,8 @@ data SIntegral# (n :: a) where
   SS# :: Sing n -> SIntegral# (S n)
 
 upSIntegral :: forall a (n::a). Integral a => Sing n -> SIntegral# n
-upSIntegral (SING 0) = unsafeCoerce SZ#
-upSIntegral (SING n) = unsafeCoerce $ SS# (SING (n-1))
+upSIntegral (SING 0) = unsafeCoerce1 SZ#
+upSIntegral (SING n) = unsafeCoerce1 $ SS# (SING (n-1))
 
 -- shared for both injective types and for Nat
 
@@ -413,37 +527,6 @@ pattern SS n <- (upSIntegral -> SS# n) where
 --------------------------------------------------------------------------------
 
 -- used to fill in 'Me' when the singular term can't be lifted
-data family Me# :: k
-type family Me :: k
-type instance Me = 'SING Me
-type instance Me = '()
-type instance Me = 'Proxy
-type instance Me = 'Const Me
-type instance Me = '(Me,Me)
-type instance Me = '(Me,Me,Me)
-type instance Me = '(Me,Me,Me,Me)
-type instance Me = '(Me,Me,Me,Me,Me)
-type instance Me = '(Me,Me,Me,Me,Me,Me)
-type instance Me = '(Me,Me,Me,Me,Me,Me,Me)
-type instance Me = '(Me,Me,Me,Me,Me,Me,Me,Me)
-type instance Me = '(Me,Me,Me,Me,Me,Me,Me,Me,Me)
-type instance Me = 'Refl
-type instance Me = 'HRefl
-type instance Me = Me# :: Dict p
-type instance Me = Me# :: p :- q
-
-type Singular k = SingI @k Me
-
-me :: forall k. Singular k => k
-me = reflect @k @Me
-
-type MkDict = Me# :: Dict p
-instance p => SingI (MkDict :: Dict p) where
-  sing = SING Dict
-
-type MkSubDict = Me# :: p :- q
-instance (p => q) => SingI (MkSubDict :: (p :- q)) where
-  sing = SING (Sub Dict)
 
 --------------------------------------------------------------------------------
 -- * Lifting (Ptr a)
