@@ -79,6 +79,7 @@ import Unsafe.Coerce
 -- @
 type StrictEq :: Type -> Constraint
 type role StrictEq nominal
+
 class Eq a => StrictEq a
 instance StrictEq (MVar a)
 instance StrictEq (IORef a)
@@ -179,6 +180,9 @@ reify k f = withSingI# f (SING k) proxy#
 reflect :: forall k (a::k). SingI a => k
 reflect = fromSing (sing @k @a)
 
+reflect# :: forall k (a::k). SingI a => Proxy# a -> k
+reflect# _ = fromSing (sing @k @a)
+
 --------------------------------------------------------------------------------
 -- * Lowering Constraint
 --------------------------------------------------------------------------------
@@ -198,7 +202,6 @@ instance Show Constraint where
 pattern Constraint :: Dict p -> Constraint
 pattern Constraint t <- (fromConstraint -> Some t) where
   Constraint t = toConstraint (Some t)
-
 
 type SConstraint# :: Constraint -> Type
 data SConstraint# p where
@@ -259,7 +262,7 @@ pattern SType t <- (upSType -> SType' t) where
 -- * Lowering Nats
 --------------------------------------------------------------------------------
 
-instance KnownNat a => SingI a where
+instance KnownNat a => SingI @Nat a where
   sing = SING $ Nat $ TN.natVal (Proxy @a)
 
 instance Show Nat where
@@ -384,39 +387,26 @@ concat <$> for
     instance SingI (Z# $(n)) where sing = SZ
     |]
 
-type SIntegral' :: forall a. a -> Type
-data SIntegral' (n :: a) where
-  SZ' :: SIntegral' Z
-  SS' :: Sing n -> SIntegral' (S n)
+type SIntegral# :: forall a. a -> Type
+data SIntegral# (n :: a) where
+  SZ# :: SIntegral# Z
+  SS# :: Sing n -> SIntegral# (S n)
 
-upSIntegral :: forall a (n::a). Integral a => Sing n -> SIntegral' n
-upSIntegral (SING 0) = unsafeCoerce SZ'
-upSIntegral (SING n) = unsafeCoerce $ SS' (SING (n-1))
+upSIntegral :: forall a (n::a). Integral a => Sing n -> SIntegral# n
+upSIntegral (SING 0) = unsafeCoerce SZ#
+upSIntegral (SING n) = unsafeCoerce $ SS# (SING (n-1))
 
 -- shared for both injective types and for Nat
 
 pattern SZ :: forall a (n::a). Integral a => n ~ Z => Sing n
-pattern SZ <- (upSIntegral -> SZ') where
+pattern SZ <- (upSIntegral -> SZ#) where
   SZ = SING 0
 
 pattern SS :: forall a (n::a). Integral a => forall (n'::a). n ~ S n' => Sing n' -> Sing n
-pattern SS n <- (upSIntegral -> SS' n) where
+pattern SS n <- (upSIntegral -> SS# n) where
   SS (Sing n) = SING (S n)
 
 {-# complete SS, SZ #-}
-
-
-
-{-
--- this breaks homo in Data.Type.Constraint, spooky
-instance forall a (n::a). (Nice a, NiceS ~ S# a, SingI n) => SingI @a (S# a n) where
-  sing = case sinj (proxy# @n) of
-    Refl -> SS (sing @a @n)
-
-instance forall a. (Integral a, Z ~ Z# a) => SingI @a (Z# a) where
-  sing = SZ
-
--}
 
 --------------------------------------------------------------------------------
 -- * Lifting Dict and types that are otherwise singleton
@@ -447,10 +437,12 @@ type Singular k = SingI @k Me
 me :: forall k. Singular k => k
 me = reflect @k @Me
 
-instance p => SingI (Me# :: Dict p) where
+type MkDict = Me# :: Dict p
+instance p => SingI (MkDict :: Dict p) where
   sing = SING Dict
 
-instance (p => q) => SingI (Me# :: (p :- q)) where
+type MkSubDict = Me# :: p :- q
+instance (p => q) => SingI (MkSubDict :: (p :- q)) where
   sing = SING (Sub Dict)
 
 --------------------------------------------------------------------------------

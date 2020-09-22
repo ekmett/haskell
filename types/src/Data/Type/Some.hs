@@ -7,8 +7,8 @@
 
 module Data.Type.Some 
   ( Some(Some)
-  , singSome
-  , someSing
+  , toSS
+  , fromSS
   , fromSC
   , toSC
   , rightSC
@@ -19,13 +19,13 @@ import Control.Applicative
 import Data.Type.Internal
 import Data.Some
 
-someSing :: Some (Sing @a) -> a
-someSing (Some (Sing a)) = a
-{-# inline someSing #-}
+fromSS :: Some (Sing @a) -> a
+fromSS (Some (Sing a)) = a
+{-# inline fromSS #-}
 
-singSome :: a -> Some (Sing @a)
-singSome a = Some (SING a)
-{-# inline singSome #-}
+toSS :: a -> Some (Sing @a)
+toSS a = Some (SING a)
+{-# inline toSS #-}
 
 type f ~> g = forall i. f i -> g i
 infixr 0 ~>

@@ -22,8 +22,19 @@
 {-# language UndecidableInstances #-}
 {-# language UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
-module Data.Type.Constraint
+
+-- |
+-- Copyright :  (c) Edward Kmett 2020
+-- License   :  BSD-2-Clause OR Apache-2.0
+-- Maintainer:  Edward Kmett <ekmett@gmail.com>
+-- Stability :  experimental
+-- Portability: non-portable
+
+module Data.Type.Meta
   ( type (!->)(..)
+  , type (!=>)
+  , SFunctor(..)
+  , SBifunctor(..)
   , (!!)
   , trans
   , refl
@@ -33,6 +44,7 @@ module Data.Type.Constraint
   , fromMe
   , No(..)
   , fromNo
+  , apply
   -- Products
   , weaken1
   , weaken2
@@ -40,6 +52,7 @@ module Data.Type.Constraint
   , stypeRep
   , weakenT1
   , weakenT2
+  , arg
   -- Constraints
   , (!\),(\!),(\\)
   , homo
@@ -50,8 +63,6 @@ module Data.Type.Constraint
   , fromC
   , weakenC1
   , weakenC2
-  , SBifunctor(..)
-  , SFunctor(..)
   ) where
 
 import Control.Applicative
@@ -72,7 +83,8 @@ type role (!->) nominal nominal
 newtype a !-> b = Subs (SingI a => Sing b)
 infixr 0 !->
 
-type instance Me = Me# :: p !-> q
+type MkSubs = Me# :: p !-> q
+type instance Me = MkSubs :: p !-> q
 instance (SingI p => SingI q) => SingI (Me# :: (p !-> q)) where
   sing = SING (Subs sing)
 
@@ -83,9 +95,12 @@ withDict r = case sing @_ @q of
 class (SingI p => SingI q) => p !=> q
 instance (SingI p => SingI q) => p !=> q
 
---eval :: '(p !=> q, p) !-> q
---eval = unmapSing \case
---  STuple2 f x -> _
+apply :: '(p !=> q, p) !-> q
+apply = unmapSing \case
+ STuple2 SConstraint p -> withSingI p sing
+
+-- curry
+-- uncurry
 
 toMe :: Singular k => a !-> (Me::k)
 toMe = unmapSing \_ -> me
@@ -168,12 +183,17 @@ weakenC1 = fromC SConstraint
 weakenC2 :: a&b !-> b
 weakenC2 = fromC SConstraint
 
-weakenT1 :: forall (a::Type) (b::Type). (a,b) !-> a
+-- for f = (,) -- this = fst
+weakenT1 :: forall (a::Type) (b::Type) (f :: Type -> Type -> Type). f a b !-> a
 weakenT1 = unmapSing \case
   SType (App (App _ a) _) -> SType a
 
-weakenT2 :: forall (a::Type) (b::Type). (a,b) !-> b
-weakenT2 = unmapSing \case
+-- for f = (,) -- this = snd
+weakenT2 :: forall (a::Type) (b::Type) (f :: Type -> Type -> Type). f a b !-> b
+weakenT2 = arg
+
+arg :: forall (f::Type -> Type) (b::Type). f b !-> b
+arg = unmapSing \case
   SType (App _ b) -> SType b
 
 stypeRep :: forall (a :: Type). Typeable a !-> a
@@ -255,3 +275,4 @@ instance SBifunctor (f :: Type -> Type -> Type) where
     SType (App (App t a) c) -> SType $ App
       (App t case mapSing f (SType a) of SType b -> b)
              case mapSing g (SType c) of SType d -> d
+

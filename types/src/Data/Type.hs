@@ -104,6 +104,10 @@ module Data.Type
   , pattern SRefl
   -- ** '(:~~:)'
   , pattern SHRefl
+  -- ** Dict p
+  , MkDict
+  -- ** p :- q
+  , MkSubDict
   ) where
 
 import Data.Type.Internal
