@@ -90,6 +90,9 @@ type instance Me = MkMeta :: p !-> q
 instance (Sing p => SingI q, r ~ MkMeta) => SingI @(p !-> q) r where
   sing = SING (Subs sing)
 
+
+
+
 withDict :: forall q r. Sing @Constraint q => (q => r) -> r
 withDict r = case sing @_ @q of
   SConstraint -> r
@@ -117,10 +120,10 @@ curry :: ('(a,b) !-> c) -> a !-> b !=> c
 curry f = unmapSing \a -> unmapSing \b -> mapSing f (STuple (a b))
 -}
 
-toMe :: Singular k => a !-> (Me::k)
+toMe :: Singular k => a !-> Me @k
 toMe = unmapSing \_ -> me
 
-fromMe :: forall i j (a::j) . Singular i => ((Me::i) !-> (a::j)) -> j
+fromMe :: forall i j (a::j). Singular i => (Me @i !-> a) -> j
 fromMe f = fromSing $ mapSing f $ sing @i @Me
 
 class No k where
@@ -130,7 +133,7 @@ instance No Void where
   no = absurd
 
 -- ex-falso, which is probably dangerous in a lazy non-total language
-fromNo :: forall k a b. No k => (a::k) !-> b
+fromNo :: forall k (a::k) b. No k => a !-> b
 fromNo = Subs $ no $ reflect @_ @a
 
 (!!) :: Sing p => (Sing q => r) -> (p !-> q) -> r
