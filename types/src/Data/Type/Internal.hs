@@ -278,7 +278,6 @@ data SDict# t where
 upSDict# :: forall (p :: Constraint) (a :: Dict p). Sing a -> SDict# a
 upSDict# (Sing Dict) = unsafeCoerce1 (SMkDict# @p)
 
-
 pattern SDict
   :: forall (p::Constraint) (r::Dict p).
   () =>
@@ -288,64 +287,37 @@ pattern SDict <- (upSDict# -> SMkDict#) where
   SDict = SING Dict
 
 type MkDict = Me# :: Dict p
-instance p => SingI (MkDict :: Dict p) where
+instance (p, r ~ MkDict) => SingI @(Dict p) r where
   sing = SDict
 
-mapC :: (p :- q) -> Sing p -> Sing q
-mapC x SConstraint = case x of
-  Sub Dict -> SConstraint
+--------------------------------------------------------------------------------
+-- * p :- q
+--------------------------------------------------------------------------------
 
-duck :: (p => q) => p :- q
-duck = Sub Dict
+type MkImpl :: p :- q
+type MkImpl = Me#
+type instance Me = MkImpl
+instance (p => q, r ~ MkImpl) => SingI @(p :- q) r where
+  sing = SING $ Sub Dict
 
+-- anything but
+type SImpl# :: forall p q. (p :- q) -> Type
+type role SImpl# nominal
+data SImpl# t where
+  SImpl# :: (p => q) => SImpl# (MkImpl :: (p :- q))
+
+upSImpl# :: Sing a -> SImpl# a
+upSImpl# (Sing (x :: (p :- q))) = unsafeCoerce1 (quack x (SImpl# @p @q))
 newtype Quack p q r = Quack ((p => q) => r)
-
 quack :: forall p q r. (p :- q) -> ((p => q) => r) -> r
-quack p r = unsafeCoerce (Quack @p @q @r r) (mapC p)
-
-{-
-dsd :: Dict (p => q) -> p :- q
-dsd d = Sub $ case d of
-  Dict -> Dict
--}
-
-
-
-{-
-data Duck p q = Duck (Sing p -> Sing q)
-sdd :: forall p q. (p :- q) -> Dict (p => q)
-sdd f = unsafeCoerce go where
-  go :: Duck p q
-  go = Duck \SConstraint -> case f of
+quack p r = unsafeCoerce (Quack @p @q @r r) (mapC p) where
+  mapC :: (p :- q) -> Sing p -> Sing q
+  mapC x SConstraint = case x of
     Sub Dict -> SConstraint
--}
 
-
-type MkSubDict :: p :- q
-type MkSubDict = Me#
-instance (p => q) => SingI (MkSubDict :: (p :- q)) where
-  sing = SING (Sub Dict)
-
--- pattern SMkSubDict :: () => (p => q, r ~ MkSubDict) => Sing @(p :- q) r
-
-
-{-
-type MkSubDict = Me# :: p :- q
-
--- Sub :: p => Dict q -> (p :- q)
--- SSub :: p => Sing (x :: Dict q) -> Sing ('Sub x :: p :- q)
-
---type MkSub# :: forall p q. (p !-> q) -> p :- q
---type MkSub# = Me#
--- pattern SSubs :: (p => q) -> Sing (MkSubDict :: p !-> q)
---
--- should be handleable by template-haskell with very minor changes
-type SEntails# :: forall p q. (p :- q) -> Type
-type role SEntails# nominal
-data SEntails# t where
-  SMkSub# :: (p => Sing q) -> SEntails# (MkSubDict :: p :- q)
-
--}
+pattern SImpl :: () => (p => q, r ~ MkImpl) => Sing @(p :- q) r
+pattern SImpl <- (upSImpl# -> SImpl#) where
+  SImpl = SING (Sub Dict)
 
 --------------------------------------------------------------------------------
 -- * Lowering Types

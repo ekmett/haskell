@@ -33,6 +33,7 @@
 
 module Data.Type.Meta
   ( type (!->)(..)
+  , MkMeta
   , type (!=>)
   , SFunctor(..)
   , SBifunctor(..)
@@ -84,11 +85,10 @@ type role (!->) nominal nominal
 newtype a !-> b = Subs (Sing a => Sing b)
 infixr 0 !->
 
-type Subsing = Me# :: p !-> q
-type instance Me = Subsing :: p !-> q
-instance (Sing p => SingI q) => SingI @(p !-> q) Subsing where
+type MkMeta = Me# :: p !-> q
+type instance Me = MkMeta :: p !-> q
+instance (Sing p => SingI q, r ~ MkMeta) => SingI @(p !-> q) r where
   sing = SING (Subs sing)
-
 
 withDict :: forall q r. Sing @Constraint q => (q => r) -> r
 withDict r = case sing @_ @q of
@@ -101,7 +101,7 @@ apply = unmapSing \case
 class (Sing p => SingI q) => p !=> q
 instance (Sing p => SingI q) => p !=> q
 
--- pattern SSubs :: (p !=> q) -> Sing (Subsing :: p !-> q)
+-- pattern SSubs :: (p !=> q) -> Sing (MkMeta :: p !-> q)
 -- wat :: Sing (p !=> q) -> Sing (Me# :: p !-> q)
 
 {-

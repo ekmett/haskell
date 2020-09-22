@@ -104,8 +104,11 @@ module Data.Type
   -- ** '(:~~:)'
   , pattern SHRefl
   -- ** Dict p
-  , MkDict
+  , type MkDict
+  , pattern SDict
   -- ** p :- q
+  , type MkImpl
+  , pattern SImpl
   --, MkSubDict
   ) where
 
