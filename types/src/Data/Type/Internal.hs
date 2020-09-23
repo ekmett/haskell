@@ -505,7 +505,23 @@ pattern SS :: forall a (n::a). Integral a => forall (n'::a). n ~ S n' => Sing n'
 pattern SS n <- (upSIntegral -> SS# n) where
   SS (Sing n) = SING (S n)
 
+type SIntegral'# :: forall a. a -> Type
+data SIntegral'# (n :: a) where
+  SZ'# :: SIntegral'# Z
+  SS'# :: Sing n -> SIntegral'# (NiceS n)
+
+upSIntegral' :: forall a (n::a). Nice a => Sing n -> SIntegral'# n
+upSIntegral' (SING 0) = unsafeCoerce1 SZ'#
+upSIntegral' (SING n) = unsafeCoerce1 $ SS'# (SING (n-1))
+
+-- nicer pattern that atually learns something for nice numerics
+pattern SS' :: forall a (n::a). Nice a => forall (n'::a). n ~ NiceS n' => Sing n' -> Sing n
+pattern SS' n <- (upSIntegral' -> SS'# n) where
+ SS' (Sing n) = SING $ case sinj (proxy# @n) of 
+   Refl -> S n
+
 {-# complete SS, SZ #-}
+{-# complete SS', SZ #-}
 
 --------------------------------------------------------------------------------
 -- * Lifting Dict and types that are otherwise singleton

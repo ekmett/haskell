@@ -56,10 +56,10 @@ module Data.Type
   , Nice(..)
   , pattern Z
   , pattern S
-  , type S
   , type Z
-  , pattern SS
+  , type S
   , pattern SZ
+  , pattern SS, pattern SS'
   -- ** 'Char'
   , MkChar
   -- ** @'Ptr' a@
