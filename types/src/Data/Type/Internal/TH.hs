@@ -6,6 +6,7 @@
 {-# Language QuasiQuotes #-}
 {-# Language BlockArguments #-}
 {-# Language ParallelListComp #-}
+{-# Language TypeApplications #-}
 {-# Language ImportQualifiedPost #-}
 {-# Language Unsafe #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
@@ -304,5 +305,5 @@ makeNice (pure -> t) = do
       type NiceS = $(s#) $(t)
       type NiceZ = $(z#) $(t)
       sinj _ = Refl
-    instance SingI n => SingI ($(s#) $(t) n) where sing = $(ss) sing
-    instance SingI ($(z#) $(t)) where sing = $(sz) |]
+    instance SingI n => SingI ($(s#) @ ($(t)) n) where sing = $(ss) sing
+    instance SingI ($(z#) @ $(t)) where sing = $(sz) |]

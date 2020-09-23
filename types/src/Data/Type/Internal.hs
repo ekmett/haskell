@@ -453,8 +453,10 @@ pattern S n <- ((\case 0 -> Nothing; n -> Just $ n-1) -> Just n)
 {-# complete Z, S :: Word64 #-}
 {-# complete Z, S :: WordPtr #-}
 
-data family Z# k :: k
-data family S# k :: k -> k
+type Z# :: forall k. k
+data family Z# :: k
+type S# :: forall k. k -> k
+data family S# :: k -> k
 
 class (Integral a, (Z::a) ~ NiceZ) => Nice a where
   type NiceZ :: a
@@ -479,11 +481,11 @@ concat <$> for
   ] \(TH.conT -> n) ->
   [d|
     instance Nice $(n) where
-      type NiceZ = Z# $(n)
-      type NiceS = S# $(n)
+      type NiceZ = Z# @ $(n)
+      type NiceS = S# @ $(n)
       sinj _ = Refl
-    instance Sing n => SingI (S# $(n) n) where sing = SS sing
-    instance SingI (Z# $(n)) where sing = SZ
+    instance Sing n => SingI (S# @ $(n) n) where sing = SS sing
+    instance SingI (Z# @ $(n)) where sing = SZ
     |]
 
 type SIntegral# :: forall a. a -> Type
