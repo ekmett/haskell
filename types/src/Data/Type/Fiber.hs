@@ -24,7 +24,7 @@ import Data.Kind
 import Data.Type.Internal
 import Data.Type.Internal.Instances
 import Data.Type.Some
-import GHC.Exts
+import GHC.Exts hiding (the)
 import Prelude hiding (id,(.))
 
 type (->#) :: Type -> Type -> Type
@@ -74,7 +74,7 @@ unarr (Fiber f) (x::a) = reify x \(_ :: Proxy# i) -> case f (sing @a @i) of
   Some (Sing b) -> b
 
 instance Arrow (->#) where
-  arr f = Fiber \x -> toSS $ f $ fromSing x
+  arr f = Fiber \x -> toSS $ f $ the x
   first f = Fiber \case
     STuple2 x y -> case runFiber f x of
       Some x' -> Some $ STuple2 x' y
@@ -107,7 +107,7 @@ instance ArrowChoice (->#) where
 
 instance ArrowApply (->#) where
   app = Fiber \case
-    STuple2 f x -> runFiber (fromSing f) x
+    STuple2 f x -> runFiber (the f) x
 
 instance ArrowLoop (->#) where
   loop f = arr $ loop (unarr f)

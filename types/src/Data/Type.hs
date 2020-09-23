@@ -23,7 +23,7 @@ module Data.Type
   (
   -- * Singleton types and reflection from singletons
     type Sing
-  , SingT(Sing, fromSing)
+  , SingT(Sing, the)
   , SingI(..)
   , makeSing
   , withSing

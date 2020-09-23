@@ -62,7 +62,7 @@ import Data.Void
 import Data.Word
 import Foreign.Ptr
 import Foreign.StablePtr
-import GHC.Exts
+import GHC.Exts hiding (the)
 import GHC.TypeLits as TL
 import GHC.TypeNats as TN
 import Language.Haskell.TH qualified as TH
@@ -132,7 +132,7 @@ type instance Sing = SingI
 
 type SingT :: forall k. k -> Type
 type role SingT nominal
-newtype SingT (a :: k) = SING { fromSing :: k }
+newtype SingT (a :: k) = SING { the :: k }
   deriving Hashable
 
 instance (Typeable k, Show k) => Show (SingT (a :: k)) where
@@ -198,10 +198,10 @@ reify :: k -> (forall (a::k). Sing a => Proxy# a -> r) -> r
 reify k f = withSing# f (SING k) proxy#
 
 reflect :: forall k (a::k). Sing a => k
-reflect = fromSing (sing @k @a)
+reflect = the (sing @k @a)
 
 reflect# :: forall k (a::k). Sing a => Proxy# a -> k
-reflect# _ = fromSing (sing @k @a)
+reflect# _ = the (sing @k @a)
 
 data family Me# :: k
 type family Me :: k

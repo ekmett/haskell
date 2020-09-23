@@ -113,7 +113,7 @@ apply = unmapSing \case
  STuple2 (Sing x) p -> _ x p
 -}
 
--- withSingI p (fromSing x)
+-- withSingI p (the x)
 
 {-
 curry :: ('(a,b) !-> c) -> a !-> b !=> c
@@ -124,7 +124,7 @@ toMe :: Singular k => a !-> Me @k
 toMe = unmapSing \_ -> me
 
 fromMe :: forall i j (a::j). Singular i => (Me @i !-> a) -> j
-fromMe f = fromSing $ mapSing f $ sing @i @Me
+fromMe f = the $ mapSing f $ sing @i @Me
 
 class No k where
   no :: k -> b
