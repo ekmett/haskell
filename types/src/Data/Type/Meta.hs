@@ -229,19 +229,19 @@ instance SFunctor (Typeable @Type) where
     SType x -> withTypeable x SConstraint
 
 instance SFunctor 'Left where
-  smap (f :: a !-> b) = unmapSing \case
+  smap f = unmapSing \case
     SLeft x -> SLeft (mapSing f x)
 
 instance SFunctor 'Right where
-  smap (f :: a !-> b) = unmapSing \case
+  smap f = unmapSing \case
     SRight x -> SRight (mapSing f x)
 
 instance SFunctor 'Const where
-  smap (f :: a !-> b) = unmapSing \case
+  smap f = unmapSing \case
     SConst x -> SConst (mapSing f x)
 
 instance SFunctor 'Just where
-  smap (f :: a !-> b) = unmapSing \case
+  smap f = unmapSing \case
     SJust x -> SJust (mapSing f x)
 
 instance SFunctor ('(,) x) where
